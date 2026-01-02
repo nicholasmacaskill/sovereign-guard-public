@@ -89,6 +89,9 @@ To run the system in **Demo Mode**:
 
 *To obtain the full commercial license with heuristics and zero-day detection, contact the developer.*
 
+> **Developer Note**: This repo uses `git-crypt`. If you are the owner, unlock the core matching your key:
+> `git-crypt unlock ./my-sovereign-key.key`
+
 ---
 
 ## 🏗️ The "Double-Lock" Architecture (Bulletproof)

@@ -11,5 +11,9 @@ venv/
 __pycache__/
 *.pyc
 
-# Proprietary Core Logic (DO NOT COMMIT)
-sovereign_core.py
+# Proprietary Core Logic (Encrypted via git-crypt)
+# sovereign_core.py is NO LONGER ignored, it is tracked but encrypted.
+
+# Encryption Keys (NEVER COMMIT)
+*.key
+.env.sovereign
