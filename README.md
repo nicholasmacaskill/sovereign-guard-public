@@ -88,6 +88,11 @@ Want to check your system right now without starting the background monitor?
 ```
 *Returns ✅ SECURE or ❌ COMPROMISED.*
 
+### 📋 Clipboard Sentry (Crypto Protection)
+The monitor now watches for "Clipboard Hijacking"—where malware replaces a Bitcoin or Ethereum address you've copied with the attacker's address.
+*   **Protection**: Real-time monitoring of crypto address patterns.
+*   **Response**: Immediate vocal warning and log alert if a replacement is detected.
+
 ### Developer Mode (Safe Mode)
 Need to debug your own browser? Enable Safe Mode to prevent the monitor from killing your process.
 ```bash

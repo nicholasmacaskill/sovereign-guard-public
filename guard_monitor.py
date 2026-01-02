@@ -4,6 +4,8 @@ import sys
 import os
 import logging
 import subprocess
+import re
+import platform
 from plyer import notification
 
 # Configure logging
@@ -37,7 +39,16 @@ DEBUG_PORTS = [9222, 9223, 9224, 9225, 9226, 9227, 9228, 9229, 1337]
 
 # Mitigation Configuration
 SAFE_MODE_FILE = "developer_mode.lock" # If this file exists, AUTO-KILL is disabled
-SAFE_LIST_PROCESSES = ['code', 'vscode', 'pycharm', 'idea', 'node', 'npm'] # Processes allowed to spawn tools
+SAFE_LIST_PROCESSES = [
+    'code', 'vscode', 'pycharm', 'idea', 'node', 'npm', 
+    'mdworker', 'mds', 'spotlight', 'launchd', 'distnoted', 
+    'cfprefsd', 'taskgated', 'tccd', 'useractivityd', 'lsd'
+] # Processes allowed to spawn tools and system tasks
+
+# Crypto Patterns for Clipboard Sentry
+BTC_PATTERN = r'\b(?:[13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[ac-hj-np-z02-9]{11,71})\b'
+ETH_PATTERN = r'\b0x[a-fA-F0-9]{40}\b'
+CRYPTO_RE = re.compile(f"{BTC_PATTERN}|{ETH_PATTERN}")
 
 # Security Configuration
 AUTO_MALWARE_SCAN = True  # Set to False to disable automatic scanning
@@ -292,6 +303,119 @@ def check_safe_mode():
     """Checks if Developer Mode is active (prevents auto-kill)."""
     return os.path.exists(SAFE_MODE_FILE)
 
+def get_clipboard_content():
+    """Gets current clipboard content using pbpaste on macOS."""
+    try:
+        if platform.system() == 'Darwin':
+            return subprocess.check_output(['pbpaste'], text=True, stderr=subprocess.DEVNULL)
+    except:
+        pass
+    return None
+
+def set_clipboard_content(text):
+    """Overwrites clipboard content using pbcopy on macOS."""
+    try:
+        if platform.system() == 'Darwin':
+            process = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
+            process.communicate(input=text.encode('utf-8'))
+            return True
+    except:
+        pass
+    return False
+
+def audit_clipboard_hijacker():
+    """Attempts to find and kill the process responsible for clipboard theft."""
+    logging.warning("Initiating Clipboard Hijacker Audit...")
+    culprits = []
+    
+    # Heuristic: Look for background processes that are:
+    # 1. Not in the safe list
+    # 2. Not in standard System/Library locations
+    # 3. Launched recently or have no executable path (script-based)
+    
+    try:
+        current_time = time.time()
+        for proc in psutil.process_iter(['pid', 'name', 'create_time', 'exe', 'cmdline']):
+            try:
+                p_info = proc.info
+                name = p_info['name']
+                exe = p_info['exe'] or ""
+                
+                # Skip safe processes
+                if any(safe in name.lower() for safe in SAFE_LIST_PROCESSES):
+                    continue
+                
+                # Skip officially signed Apple System processes
+                if exe.startswith('/System/') or exe.startswith('/usr/lib/') or exe.startswith('/usr/bin/'):
+                    continue
+
+                # If launched in the last 300 seconds (5 mins) and not a common app
+                if (current_time - p_info['create_time']) < 300:
+                    # Very suspicious if it's a python script or a hidden binary
+                    if 'python' in name.lower() or name.startswith('.'):
+                        culprits.append(proc)
+                    else:
+                        # Add to potential list if it's a non-standard path
+                        if '/Users/' in exe:
+                            culprits.append(proc)
+            except:
+                continue
+                
+        # Neutralize the most suspicious (limit to top 3 to avoid system instability)
+        neutralized_names = []
+        for culprit in culprits[:3]:
+            try:
+                c_pid = culprit.pid
+                c_name = culprit.name()
+                logging.warning(f"⚡️ NEUTRALIZING HIJACK CULPRIT: {c_name} (PID: {c_pid})")
+                culprit.kill()
+                neutralized_names.append(f"{c_name} (PID: {c_pid})")
+            except:
+                continue
+        
+        if neutralized_names:
+            msg = f"Neutralized {len(neutralized_names)} suspect(s): " + ", ".join(neutralized_names)
+            speak("Sovereign Guard neutralized the clipboard threat.")
+            return msg
+    except Exception as e:
+        logging.error(f"Error during hijacker audit: {e}")
+        
+    return "No clear culprit found. Full malware scan recommended."
+
+def check_clipboard_sentry(last_val):
+    """Monitors for suspicious crypto address replacement and NEUTRALIZES the threat."""
+    current_val = get_clipboard_content()
+    if not current_val or current_val == last_val:
+        return current_val, None
+
+    # Check if current content is a crypto address
+    current_match = CRYPTO_RE.search(current_val)
+    last_match = CRYPTO_RE.search(last_val) if last_val else None
+
+    if current_match:
+        curr_addr = current_match.group(0)
+        
+        # Scenario: User had a crypto address in clipboard, and it was replaced by a DIFFERENT one
+        if last_match:
+            prev_addr = last_match.group(0)
+            if curr_addr != prev_addr:
+                # Potential Hijack Detected
+                alert_msg = f"❌ CLIPBOARD HIJACK DETECTED!\n" \
+                          f"    Address replaced: {prev_addr[:10]}... -> {curr_addr[:10]}...\n" \
+                          f"    ⚡️ NEUTRALIZING: Overwriting clipboard with safety warning."
+                
+                # 1. IMMEDIATE NEUTRALIZATION: Overwrite the clipboard
+                safety_msg = "⚠️ SOVEREIGN GUARD: CLIPBOARD HIJACK DETECTED! DO NOT PASTE. ⚠️"
+                set_clipboard_content(safety_msg)
+                
+                # 2. AUDIT AND KILL
+                audit_result = audit_clipboard_hijacker()
+                alert_msg += f"\n    Result: {audit_result}"
+                
+                return safety_msg, alert_msg
+
+    return current_val, None
+
 def monitor_loop():
     """Main monitoring loop."""
     print("Sovereign Guard Monitor Active...")
@@ -305,9 +429,17 @@ def monitor_loop():
     
     # State tracking for voice feedback
     was_safe_mode = False
+    last_clipboard = get_clipboard_content()
 
     try:
         while True:
+            # 1. Clipboard Sentry Check
+            last_clipboard, cb_alert = check_clipboard_sentry(last_clipboard)
+            if cb_alert:
+                print(f"\n{cb_alert}")
+                logging.warning(cb_alert)
+                speak("Warning. Clipboard hijack attempt detected. Verify your destination address.")
+
             # Check for Developer Mode Toggle
             is_safe_mode = check_safe_mode()
             if is_safe_mode and not was_safe_mode:
