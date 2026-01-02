@@ -48,10 +48,11 @@ DEBUG_PORTS = [9222, 9223, 9224, 9225, 9226, 9227, 9228, 9229, 1337]
 # Mitigation Configuration
 SAFE_MODE_FILE = "developer_mode.lock" # If this file exists, AUTO-KILL is disabled
 SAFE_LIST_PROCESSES = [
-    'code', 'vscode', 'pycharm', 'idea', 'node', 'npm', 
+    'code', 'vscode', 'pycharm', 'idea', 'node', 'npm', 'git', 'docker',
     'mdworker', 'mds', 'spotlight', 'launchd', 'distnoted', 
     'cfprefsd', 'taskgated', 'tccd', 'useractivityd', 'lsd',
-    'knowledge-agent', 'spotlightknowledged'
+    'knowledge-agent', 'spotlightknowledged',
+    'terminal', 'iterm2', 'warp', 'finder', 'dock', 'softwareupdated'
 ] # Processes allowed to spawn tools and system tasks
 
 # Hardened Path Validation

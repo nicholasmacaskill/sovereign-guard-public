@@ -131,9 +131,9 @@ Use the `sovereign` CLI to manage your perimeter.
 
 ### 🛡️ Whitelisted System Processes
 Sovereign Guard ignores specific developer tools and system daemons to prevent false positives. The following processes are **EXEMPT** from termination:
-*   **Developer Tools**: `code`, `vscode`, `pycharm`, `idea`, `node`, `npm`
-*   **System Daemons**: `spotlight`, `mdworker` (Index), `launchd`, `distnoted`, `cfprefsd`, `taskgated`, `tccd`, `useractivityd`
-*   **Intelligence Agents**: `knowledge-agent`, `spotlightknowledged`, `lsd`
+*   **Developer Tools**: `code`, `vscode`, `node`, `npm`, `git`, `docker`, `iterm2`, `terminal`, `warp`
+*   **System Daemons**: `spotlight`, `launchd`, `finder`, `dock`, `softwareupdated`, `taskgated`
+*   **Intelligence Agents**: `knowledge-agent`, `spotlightknowledged`
 
 ### 📊 Logs & Diagnostics
 *   **Audit Trail**: All events are logged to `guard_monitor.log` (JSON-structured for parsing).
