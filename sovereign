@@ -197,6 +197,28 @@ def main():
         start()
     elif cmd == 'status':
         status()
+    elif cmd == 'clean': # Added clean command
+        ctl.clean_logs()
+    elif cmd == 'uninstall': # Added uninstall command
+        print("\n🗑️  SOVEREIGN GUARD UNINSTALL")
+        print("=" * 50)
+        
+        # Confirm
+        confirm = input("\n⚠️  This will:\n"
+                       "  - Stop all Sovereign Guard processes\n"
+                       "  - Remove LaunchAgent\n"
+                       "  - Delete logs (optional)\n"
+                       "\nAre you sure? (yes/no): ")
+        
+        if confirm.lower() != 'yes':
+            print("❌ Uninstall cancelled.")
+            sys.exit(0)
+        
+        # Ask about logs
+        keep_logs = input("\nKeep learning logs for future reinstall? (yes/no): ")
+        delete_logs = keep_logs.lower() != 'yes'
+        
+        ctl.uninstall(delete_logs=delete_logs)
     elif cmd == 'dev':
         dev_mode()
     elif cmd == 'secure':
