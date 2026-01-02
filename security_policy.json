@@ -1,0 +1,25 @@
+{
+    "policyVersion": "1.0",
+    "authentication": {
+        "allowedMethods": [
+            "fido2",
+            "webauthn"
+        ],
+        "forbiddenMethods": [
+            "sms",
+            "totp",
+            "email_magic_link"
+        ],
+        "mfaRequired": true,
+        "requireResidentKey": true,
+        "userVerification": "required"
+    },
+    "adminRoutes": {
+        "pattern": "/admin/*",
+        "enforcementLevel": "strict"
+    },
+    "session": {
+        "maxAgeSeconds": 3600,
+        "rotationIntervalSeconds": 900
+    }
+}
