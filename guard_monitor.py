@@ -199,16 +199,34 @@ def monitor_loop():
             current_pids = set()
             scanned_count = 0
             
+            # Main Monitoring Loop
+            scanned_pids = set()  # Track already-scanned PIDs this iteration
+            
             # 2. Process Scanning (Uses Core Logic)
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            for proc in psutil.process_iter(['pid', 'name', 'exe', 'cmdline']):
                 try:
-                    name = proc.info['name']
+                    pid = proc.pid
+                    name = proc.name()
+                    
+                    # Performance: Skip if already scanned this iteration
+                    if pid in scanned_pids:
+                        continue
+                    scanned_pids.add(pid)
+                    
+                    # Skip if whitelisted process (no need to check details)
+                    name_lower = name.lower()
+                    is_safe = False
+                    for safe in core.SAFE_LIST_PROCESSES:
+                        if name_lower == safe or name_lower.startswith(f"{safe} ") or name_lower.startswith(f"{safe}."):
+                            is_safe = True
+                            break
+                    
+                    if is_safe:
+                        current_pids.add(pid)
+                        continue
+                    
                     scanned_count += 1
                     
-                    # Optimization: Skip safe processes quickly
-                    if name.lower() in core.SAFE_LIST_PROCESSES:
-                        continue
-                        
                     # Detailed Core Check
                     alert = core.check_process(proc, safe_mode=is_safe_mode)
                     if alert:
@@ -238,25 +256,30 @@ def monitor_loop():
                         elif is_safe_mode:
                             speak("Threat detected. Intervention suspended.")
                     
-                    # Network Activity Check (Reverse Shell & Data Exfiltration Detection)
-                    network_threat = core.check_network_activity(proc)
-                    if network_threat:
-                        print(f"\n{network_threat['summary']}")
-                        logger.warning(f"[NETWORK] {network_threat['summary']}")
-                        
-                        notify_alert(network_threat['title'], network_threat['summary'])
-                        
-                        # Kill reverse shells immediately
-                        if not is_safe_mode and network_threat['critical']:
-                            try:
-                                proc.kill()
-                                print("⚡️ REVERSE SHELL NEUTRALIZED (Process Killed)")
-                                speak("Reverse shell detected and neutralized.")
-                            except:
-                                print("❌ Failed to kill reverse shell.")
-                        elif not network_threat['critical']:
-                            # Just warn for suspicious connections
-                            speak("Suspicious network connection detected.")
+                    # Network Activity Check (Only for browsers and unknown processes)
+                    # Performance: Skip network check for safe system processes
+                    is_browser = any(t in name_lower for t in ['chrome', 'brave', 'edge', 'arc', 'opera', 'vivaldi', 'chromium'])
+                    should_check_network = is_browser or not is_safe
+                    
+                    if should_check_network:
+                        network_threat = core.check_network_activity(proc)
+                        if network_threat:
+                            print(f"\n{network_threat['summary']}")
+                            logger.warning(f"[NETWORK] {network_threat['summary']}")
+                            
+                            notify_alert(network_threat['title'], network_threat['summary'])
+                            
+                            # Kill reverse shells immediately
+                            if not is_safe_mode and network_threat['critical']:
+                                try:
+                                    proc.kill()
+                                    print("⚡️ REVERSE SHELL NEUTRALIZED (Process Killed)")
+                                    speak("Reverse shell detected and neutralized.")
+                                except:
+                                    print("❌ Failed to kill reverse shell.")
+                            elif not network_threat['critical']:
+                                # Just warn for suspicious connections
+                                speak("Suspicious network connection detected.")
                     
                     current_pids.add(proc.pid)
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
