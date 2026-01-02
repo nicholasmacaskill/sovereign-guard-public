@@ -73,7 +73,21 @@ This script will:
 3.  Launch the protection immediately.
 
 You will hear: *"Sovereign Guard online. Verification active."* 
+You will hear: *"Sovereign Guard online. Verification active."* 
 That's it. You are secure.
+
+## ⚠️ Important: "Core Logic" Requirement
+**Note for GitHub Users**: This repository contains the **Public Shell** (`guard_monitor.py`) and a **Demo Core** (`sovereign_core_example.py`).
+The proprietary detection logic (`sovereign_core.py`) is **not included** in this public release.
+
+To run the system in **Demo Mode**:
+1.  Rename the example file:
+    ```bash
+    mv sovereign_core_example.py sovereign_core.py
+    ```
+2.  Run the setup script.
+
+*To obtain the full commercial license with heuristics and zero-day detection, contact the developer.*
 
 ---
 

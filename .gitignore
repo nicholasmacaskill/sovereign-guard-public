@@ -1,19 +1,15 @@
-# Virtual Environment
+# Sovereign Guard Secrets
+.env.sovereign
+guard_monitor.log
+guard_watchdog.out
+guard_watchdog.err
+guard_supervisor.pid
+developer_mode.lock
+
+# Virtual Env
 venv/
 __pycache__/
-*.py[cod]
+*.pyc
 
-# Logs and Status
-*.log
-*.pid
-*.out
-*.err
-
-# Secrets & Config
-.env
-.env.sovereign
-.DS_Store
-
-# Test artifacts
-chrome_simulation
-mock_pid*.txt
+# Proprietary Core Logic (DO NOT COMMIT)
+sovereign_core.py

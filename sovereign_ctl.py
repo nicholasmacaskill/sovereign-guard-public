@@ -180,9 +180,34 @@ def scan_now():
     except ImportError:
         print("[!] psutil not found in system python. Run via ./venv/bin/python3")
 
+def clean_logs():
+    """Wipes log files."""
+    for log in ["guard_monitor.log", "guard_monitor.out", "guard_monitor.err", "guard_watchdog.out", "guard_watchdog.err"]:
+        if os.path.exists(log):
+            open(log, 'w').close()
+    print("✨ Logs cleaned.")
+
+def uninstall():
+    """Removes the LaunchAgent and cleans up."""
+    print("🗑️  Uninstalling Sovereign Guard...")
+    stop()
+    
+    plist_path = os.path.expanduser("~/Library/LaunchAgents/com.sovereign.watchdog.plist")
+    if os.path.exists(plist_path):
+        print("    [-] Unloading LaunchAgent...")
+        subprocess.run(["launchctl", "unload", plist_path], stderr=subprocess.DEVNULL)
+        os.remove(plist_path)
+        print("    [+] LaunchAgent removed.")
+    else:
+        print("    [-] No LaunchAgent found.")
+        
+    print("    [-] Cleaning logs...")
+    clean_logs()
+    print("✅ Uninstallation complete. (Virtual environment remains in ./venv)")
+
 def main():
     if len(sys.argv) < 2:
-        print("Usage: ./sovereign {start|stop|restart|status|dev|secure|scan}")
+        print("Usage: ./sovereign {start|stop|restart|status|dev|secure|scan|clean|uninstall}")
         sys.exit(1)
         
     cmd = sys.argv[1].lower()
@@ -211,9 +236,13 @@ def main():
                 sys.exit(1)
         else:
             scan_now()
+    elif cmd == 'clean':
+        clean_logs()
+    elif cmd == 'uninstall':
+        uninstall()
     else:
         print(f"Unknown command: {cmd}")
-        print("Usage: ./sovereign {start|stop|restart|status|dev|secure|scan}")
+        print("Usage: ./sovereign {start|stop|restart|status|dev|secure|scan|clean|uninstall}")
 
 if __name__ == "__main__":
     main()
