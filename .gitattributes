@@ -1,22 +1,26 @@
+# Language Identity (Force GitHub to show Python primary)
+*.py linguist-language=Python
+SovereignNative/** linguist-vendored
+
 # Sovereign Guard: Proprietary Moat (Encrypted)
-SovereignNative/** filter=git-crypt diff=git-crypt linguist-language=Swift
+SovereignNative/** filter=git-crypt diff=git-crypt
 ENCRYPTION_STRATEGY.md filter=git-crypt diff=git-crypt
-sovereign_core.py filter=git-crypt diff=git-crypt linguist-language=Python
-learning_engine.py filter=git-crypt diff=git-crypt linguist-language=Python
-ai_forensics.py filter=git-crypt diff=git-crypt linguist-language=Python
-watchdog.py filter=git-crypt diff=git-crypt linguist-language=Python
-guard_monitor.py filter=git-crypt diff=git-crypt linguist-language=Python
+sovereign_core.py filter=git-crypt diff=git-crypt
+learning_engine.py filter=git-crypt diff=git-crypt
+ai_forensics.py filter=git-crypt diff=git-crypt
+watchdog.py filter=git-crypt diff=git-crypt
+guard_monitor.py filter=git-crypt diff=git-crypt
 .env.sovereign filter=git-crypt diff=git-crypt
 whitelist_master.json filter=git-crypt diff=git-crypt
 
 # Sovereign Guard: Public Interfaces & Utilities (Unsealed for Trust)
-sovereign_dashboard.py !filter !diff linguist-language=Python
-sovereign_ctl.py !filter !diff linguist-language=Python
-audit_system.py !filter !diff linguist-language=Python
-bootstrap_discovery.py !filter !diff linguist-language=Python
+sovereign_dashboard.py !filter !diff
+sovereign_ctl.py !filter !diff
+audit_system.py !filter !diff
+bootstrap_discovery.py !filter !diff
 setup.sh !filter !diff
-path_utils.py !filter !diff linguist-language=Python
-test_suite.py !filter !diff linguist-language=Python
-sovereign !filter !diff linguist-language=Python
+path_utils.py !filter !diff
+test_suite.py !filter !diff
+sovereign !filter !diff
 README.md !filter !diff
 MARKETING_COPY.md !filter !diff
