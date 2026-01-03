@@ -13,6 +13,8 @@ watchdog.py filter=git-crypt diff=git-crypt
 guard_monitor.py filter=git-crypt diff=git-crypt
 .env.sovereign filter=git-crypt diff=git-crypt
 whitelist_master.json filter=git-crypt diff=git-crypt
+MARKETING_COPY.md filter=git-crypt diff=git-crypt
+STARTUP_PITCH.md filter=git-crypt diff=git-crypt
 
 # Sovereign Guard: Public Interfaces & Utilities (Unsealed for Trust)
 sovereign_dashboard.py !filter !diff
@@ -24,4 +26,3 @@ path_utils.py !filter !diff
 test_suite.py !filter !diff
 sovereign !filter !diff
 README.md !filter !diff
-MARKETING_COPY.md !filter !diff
