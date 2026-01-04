@@ -13,6 +13,11 @@
 .trigger_*
 developer_mode.lock
 
+# Runtime Directories (Generated)
+data/
+logs/
+run/
+
 # Virtual Env
 venv/
 __pycache__/

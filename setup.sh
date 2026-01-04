@@ -45,14 +45,16 @@ else
 fi
 
 # Make scripts executable
-chmod +x audit_system.py
-chmod +x guard_monitor.py
+chmod +x tools/audit_system.py
+chmod +x src/guard_monitor.py
+chmod +x src/watchdog.py
+chmod +x sovereign
 
 echo "[*] Setting up Launch Agent for Process Monitor (macOS)..."
 
 # Define the LaunchAgent plist
 PLIST_PATH="$HOME/Library/LaunchAgents/com.sovereign.watchdog.plist"
-SCRIPT_PATH="$(pwd)/watchdog.py"
+SCRIPT_PATH="$(pwd)/src/watchdog.py"
 PYTHON_PATH="$(pwd)/venv/bin/python3"
 
 cat <<EOF > "$PLIST_PATH"
@@ -72,9 +74,9 @@ cat <<EOF > "$PLIST_PATH"
     <key>KeepAlive</key>
     <true/>
     <key>StandardErrorPath</key>
-    <string>$(pwd)/guard_watchdog.err</string>
+    <string>$(pwd)/logs/guard_watchdog.err</string>
     <key>StandardOutPath</key>
-    <string>$(pwd)/guard_watchdog.out</string>
+    <string>$(pwd)/logs/guard_watchdog.out</string>
 </dict>
 </plist>
 EOF
@@ -83,11 +85,12 @@ echo "    [INFO] Created plist at $PLIST_PATH"
 echo "    [NOTE] To activate, run: launchctl load $PLIST_PATH"
 
 echo "[*] Installing Command Line Interface..."
-cp sovereign_ctl.py sovereign
+# Source files are now in src/
+# CLI is now a pre-existing root script developed by Antigravity
 chmod +x sovereign
-echo "    [PASS] CLI installed as './sovereign'"
+echo "    [PASS] CLI configured as './sovereign'"
 
 echo "==========================================="
 echo "   Setup Complete.                         "
-echo "   Run './venv/bin/python3 audit_system.py' to verify OS."
+echo "   Run './venv/bin/python3 tools/audit_system.py' to verify OS."
 echo "==========================================="

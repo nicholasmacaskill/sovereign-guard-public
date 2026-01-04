@@ -28,6 +28,40 @@ else
     cd "$INSTALL_DIR"
 fi
 
+# 2.5 Unlock Proprietary Core (The Moat)
+echo ""
+echo "🔐 Sovereign Guard Pro / Enterprise"
+echo "   The core logic of this repository is encrypted to protect IP."
+echo "   Public tools (CLI, Dashboard) are free. The Engine requires a license."
+echo ""
+
+if ! command -v git-crypt &> /dev/null; then
+    echo "⚠️  git-crypt not found. Installing via Homebrew..."
+    if command -v brew &> /dev/null; then
+        brew install git-crypt
+    else
+        echo "❌ Error: Homebrew not found. Please install 'git-crypt' manually."
+        exit 1
+    fi
+fi
+
+# Check if already unlocked
+if grep -q "sovereign_core.py" .git/git-crypt/keys/* 2>/dev/null; then
+    echo "   ✅ Core is already unlocked."
+else
+    echo -n "🔑 Enter path to your Sovereign License Key (.key file): "
+    read LICENSE_KEY_PATH
+    
+    if [ -f "$LICENSE_KEY_PATH" ]; then
+        echo "   Unlocking Core Engine..."
+        git-crypt unlock "$LICENSE_KEY_PATH"
+        echo "   ✅ Moat Unlocked. Proprietary assets utilized."
+    else
+        echo "   ❌ Invalid Key Path. Installing Public Shell ONLY."
+        echo "   (The monitor will fail to start without the core engine)"
+    fi
+fi
+
 # 3. Setup Virtual Environment
 echo "   Setting up isolated environment..."
 if [ ! -d "venv" ]; then
@@ -44,7 +78,7 @@ echo "   Linking 'sovereign' command..."
 cat <<EOF > "$INSTALL_DIR/sovereign-wrapper"
 #!/bin/bash
 cd "$INSTALL_DIR"
-./venv/bin/python3 sovereign_ctl.py "\$@"
+./venv/bin/python3 src/sovereign_ctl.py "\$@"
 EOF
 
 chmod +x "$INSTALL_DIR/sovereign-wrapper"

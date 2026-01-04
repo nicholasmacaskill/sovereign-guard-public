@@ -58,7 +58,7 @@ Attackers do not need to hijack your *active* browser window. Instead, they laun
 Sovereign Guard neutralizes these threats through multi-layered, low-latency monitoring.
 
 ### 🏗️ Execution Integrity (Anti-Hijack)
-*   **Watchdog Supervisor**: A dedicated `watchdog.py` process acts as a supervisor, instantly resurrecting the monitor if it is killed by malware.
+*   **Watchdog Supervisor**: A dedicated `src/watchdog.py` process acts as a supervisor, instantly resurrecting the monitor if it is killed by malware.
 *   **Flag Neutralization**: Kills any browser process launched with dangerous flags (`--load-extension`) that allow unvetted code execution. Suspicious flags (`--remote-debugging-port`, `--headless`) trigger warnings but don't kill (developer-friendly).
 *   **Comprehensive Path Validation**: Validates processes against **9 legitimate system paths** (not just `/Applications/`):
     - `/Applications/` - User-installed apps
@@ -113,14 +113,11 @@ You will hear: *"Sovereign Guard online. Verification active."*
 That's it. You are secure.
 
 ## ⚠️ Important: "Core Logic" Requirement
-**Note for GitHub Users**: This repository contains the **Public Shell** (`guard_monitor.py`) and a **Demo Core** (`sovereign_core_example.py`).
+**Note for GitHub Users**: This repository contains the **Public Shell** (`src/guard_monitor.py`) and a **Demo Core** (`src/sovereign_core.py` facade).
 The proprietary detection logic (`sovereign_core.py`) is **not included** in this public release.
 
 To run the system in **Demo Mode**:
-1.  Rename the example file:
-    ```bash
-    mv sovereign_core_example.py sovereign_core.py
-    ```
+1.  Explore the logic in `src/sovereign_engine/`.
 2.  Run the setup script.
 
 *To obtain the full commercial license with heuristics and zero-day detection, contact the developer.*
@@ -283,8 +280,8 @@ Sovereign Guard ignores specific developer tools and system daemons to prevent f
 *   **Intelligence Agents**: `knowledge-agent`, `spotlightknowledged`
 
 ### 📊 Logs & Diagnostics
-*   **Audit Trail**: All events are logged to `guard_monitor.log` (JSON-structured for parsing).
-*   **Watcher Logs**: Supervisor events are found in `guard_watchdog.out`.
+*   **Audit Trail**: All events are logged to `logs/guard_monitor.log` (JSON-structured for parsing).
+*   **Watcher Logs**: Supervisor events are found in `logs/guard_watchdog.out`.
 *   **Feedback**: Uses macOS native `say` for vocal alerts (Samantha voice) and `osascript` for desktop notifications.
 
 **Stay Sovereign. Stay Secure.**
