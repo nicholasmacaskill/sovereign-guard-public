@@ -1,4 +1,4 @@
-# 🛡️ Sovereign Guard Suite (2026 Enterprise Edition)
+# Sovereign Guard Suite (2026 Enterprise Edition)
 
 > **"Your hardware is secure, but is your session?"**
 
@@ -8,16 +8,16 @@ Sovereign Guard is a high-fidelity, zero-trust security perimeter designed to pr
 
 ---
 
-## 💎 The "Glass" Architecture
+## The "Glass" Architecture
 
 Sovereign Guard is built on a **"Glass" Philosophy**: Transparency where it matters, opacity where it's needed.
 
 *   **Public Shell (Open Source)**: The wrapper scripts, monitoring loops, and CLI tools (`src/guard_monitor.py`, `sovereign_ctl`) are fully open-source. You can verify exactly *how* the system watches you.
-*   **Encrypted Core (Proprietary)**: The advanced heuristic engines (`src/sovereign_engine/`)—which detect zero-day anomalies, counter-adversarial behavior, and AI forensics—are **encrypted** in this repository. This protects the detection IP while allowing the community to audit the orchestration logic.
+*   **Redacted Core (Proprietary)**: The specific threat intelligence lists (e.g., known malware signatures, proprietary heuristic patterns) have been **redacted** from this public repository. This ensures the logic is audit-compatible while protecting specific intellectual property.
 
 ---
 
-## ⚡️ The 2026 Threat Landscape
+## The 2026 Threat Landscape
 
 In 2026, account hijacking has evolved beyond simple cookie theft. Attackers now leverage:
 
@@ -29,27 +29,27 @@ Sovereign Guard neutralizes these threats instantly.
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
-### 🛡️ Active Defense
+### Active Defense
 -   **Anti-Hijack Sentry**: Instantly terminates browsers launching with debug flags or suspicious extensions.
 -   **Clipboard Fortress**: Detects and reverts malicious address swaps (BTC/ETH) and sanitized command injections.
 -   **Reverse Shell Terminator**: Kills unauthorized shells connecting to non-trusted IPs.
 -   **Persistence Monitor**: Watches `LaunchAgents` and `~/.ssh` for unauthorized backdoors.
 
-### 🧠 AI-Native Intelligence
+### AI-Native Intelligence
 -   **Learning Mode**: A 7-day adaptive phase that learns your specific workflow.
 -   **Bootstrap Acceleration**: Skip the wait—instantly scan your system to build a Trusted Baseline in seconds.
 -   **Trust Score**: A real-time `0-100` health metric visible on your dashboard.
 -   **Supply Chain Sentinel**: Scans for "typosquatting" packages in your dev environment.
 
-### 🔐 Sovereign Identity
+### Sovereign Identity
 -   **Rubicon 2FA**: Enforce hardware-key (YubiKey) or TOTP verification for sensitive commands (`stop`, `off`).
 -   **Double-Lock Resilience**: A "Watchdog" supervisor ensures the monitor cannot be disabled by user-space malware.
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 **1. Install & Setup**
 ```bash
@@ -70,7 +70,7 @@ Instead of waiting 7 days, instantly learn your current environment:
 
 ---
 
-## 🕹️ Command Center
+## Command Center
 
 Use the `sovereign` CLI to control your perimeter:
 
@@ -86,7 +86,7 @@ Use the `sovereign` CLI to control your perimeter:
 
 ---
 
-## ⚙️ Configuration Modes
+## Configuration Modes
 
 Sovereign Guard operates in three modes, controlled by `.env.sovereign`:
 
@@ -103,12 +103,12 @@ echo 'PROTECTION_MODE="protect"' >> .env.sovereign
 
 ---
 
-## � Security Note
+## Security Note
 
-This repository contains **encrypted binaries** (via `git-crypt`) for the `sovereign_engine`.
-To unlock the full detection logic, you must possess the authorized GPG key.
+This repository uses **Source Redaction** to protect proprietary threat intelligence.
+While the orchestration logic is visible, specific signature lists (`DEFAULT_SAFE_LIST`, `THREAT_PATTERNS`) have been scrubbed from `src/sovereign_engine/`.
 
-*   **Public**: `src/guard_monitor.py`, `tools/`, `sovereign_ctl`
-*   **Encrypted**: `src/sovereign_engine/`, `docs/MARKETING_COPY.md`
+*   **Public Logic**: `src/guard_monitor.py`, `src/sovereign_engine/scanners.py` (logic only)
+*   **Redacted Data**: `src/sovereign_engine/patterns.py`
 
 **Stay Sovereign.**
