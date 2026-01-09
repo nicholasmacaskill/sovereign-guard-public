@@ -31,3 +31,4 @@ dist/
 # Encryption Keys (NEVER COMMIT)
 *.key
 .env.sovereign
+

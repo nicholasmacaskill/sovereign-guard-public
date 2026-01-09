@@ -156,3 +156,4 @@ If you find behavior that contradicts this guide, **open a GitHub issue immediat
 [https://github.com/nicholasmacaskill/python-sovereign-guard/issues](https://github.com/nicholasmacaskill/python-sovereign-guard/issues)
 
 Security tools require trust. This guide exists so you don't have to take my word for it—**verify everything yourself**.
+

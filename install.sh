@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Sovereign Guard - One-Line Installer
+# Sovereign Guard - One-Line Installer -
 # Usage: curl -sL https://raw.githubusercontent.com/nicholasmacaskill/python-sovereign-guard/main/install.sh | bash
 
 set -e

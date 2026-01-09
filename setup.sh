@@ -2,7 +2,7 @@
 
 echo "==========================================="
 echo "   Initializing Sovereign Guard Suite      "
-echo "==========================================="
+echo "===========================================-"
 
 # check python installation
 if ! command -v python3 &> /dev/null; then
