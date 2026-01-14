@@ -1,8 +1,13 @@
 import os
+import sys
 import json
 import subprocess
 import psutil
 from datetime import datetime
+
+# Add src/ to path so we can import modules
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
+
 from learning_engine import log_process, log_network_connection, LEARNING_LOG, NETWORK_LOG
 
 def bootstrap_system_discovery():

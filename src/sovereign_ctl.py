@@ -185,6 +185,24 @@ def setup_2fa():
         lines.append(f"SOVEREIGN_2FA_SECRET={totp_secret}\n")
         with open(env_path, 'w') as f: f.writelines(lines)
         print("\n✅ 2FA Configured & Saved.")
+
+def bootstrap():
+    """Runs the bootstrap system discovery tool."""
+    if not authorize_action(): return
+    print("🚀 SOVEREIGN GUARD // BOOTSTRAP")
+    
+    script_path = os.path.join(path_utils.get_project_root(), "tools", "bootstrap_discovery.py")
+    if not os.path.exists(script_path):
+        print(f"[!] Bootstrap script not found at: {script_path}")
+        return
+
+    try:
+        subprocess.check_call([VENV_PYTHON, script_path])
+    except subprocess.CalledProcessError as e:
+        print(f"[!] Bootstrap failed: {e}")
+    except OSError as e:
+        print(f"[!] Execution failed: {e}")
+
         
 def view_logs():
     """Views today's security alerts"""
@@ -210,7 +228,9 @@ def main():
         'start': start, 'stop': stop, 'status': status, 'dev': dev_mode,
         'secure': secure_mode, 'scan': scan_now, '2fa': setup_2fa,
         'restart': lambda: (stop(), time.sleep(1), start()),
+        'restart': lambda: (stop(), time.sleep(1), start()),
         'logs': view_logs,
+        'bootstrap': bootstrap,
         'clean': lambda: [os.remove(path_utils.get_log_file(l)) for l in ["guard_monitor.log", "guard_watchdog.out", "guard_monitor.out", "guard_monitor.err", "guard_watchdog.err"] if os.path.exists(path_utils.get_log_file(l))]
     }
     
