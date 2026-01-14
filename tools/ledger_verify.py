@@ -75,3 +75,4 @@ def print_proof_instruction(fingerprint, file_count):
 if __name__ == "__main__":
     fingerprint, count = generate_fingerprint()
     print_proof_instruction(fingerprint, count)
+

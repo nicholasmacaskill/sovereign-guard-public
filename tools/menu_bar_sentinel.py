@@ -49,3 +49,4 @@ class SovereignSentinel(rumps.App):
 
 if __name__ == "__main__":
     SovereignSentinel().run()
+
