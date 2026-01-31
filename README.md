@@ -33,9 +33,10 @@ Sovereign Guard neutralizes these threats instantly.
 
 ### Active Defense
 -   **Anti-Hijack Sentry**: Instantly terminates browsers launching with debug flags or suspicious extensions.
--   **Clipboard Fortress**: Detects and reverts malicious address swaps (BTC/ETH) and sanitized command injections.
+-   **Clipboard Fortress**: 🛡️ **NEW**: Detects and reverts "Click-Fix" social engineering, malicious address swaps (BTC/ETH), and sanitized command injections.
+-   **Persistence Monitor**: Watches `LaunchAgents` and 🛡️ **NEW**: Browser Service Workers/Hosted Apps for unauthorized backdoors.
 -   **Reverse Shell Terminator**: Kills unauthorized shells connecting to non-trusted IPs.
--   **Persistence Monitor**: Watches `LaunchAgents` and `~/.ssh` for unauthorized backdoors.
+-   **Infostealer Forensic**: 🛡️ **NEW**: Scans browser history for known infostealer gateways and malicious landing pages.
 
 ### AI-Native Intelligence
 -   **Learning Mode**: A 7-day adaptive phase that learns your specific workflow.
