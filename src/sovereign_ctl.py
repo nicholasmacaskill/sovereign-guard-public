@@ -90,12 +90,17 @@ def stop():
 
     print(f"[-] Stopping Sovereign Guard (PID: {pid})...")
     try:
+        # Kill the supervisor
         os.kill(pid, signal.SIGTERM)
+        
+        # Kill any orphaned monitors
+        subprocess.run(["pkill", "-f", "guard_monitor.py"], capture_output=True)
+        
         for _ in range(10):
             if not is_running(pid): break
             time.sleep(0.1)
         if os.path.exists(PID_FILE): os.remove(PID_FILE)
-        print("[+] Monitor stopped.")
+        print("[+] Sovereign Guard stopped and cleaned.")
     except Exception as e:
         print(f"[!] Stop failed: {e}")
 
@@ -223,15 +228,49 @@ def view_logs():
     else:
         print("   [!] Log file not found.")
 
+def clean_logs():
+    """Removes all log and error files."""
+    logs = ["guard_monitor.log", "guard_watchdog.out", "guard_monitor.out", "guard_monitor.err", "guard_watchdog.err"]
+    for l in logs:
+        path = path_utils.get_log_file(l)
+        if os.path.exists(path):
+            os.remove(path)
+    print("🧹 Logs cleaned.")
+
+def dashboard():
+    """Displays the Sovereign Guard Dashboard."""
+    print("📊 Opening Dashboard...")
+    try:
+        script_path = os.path.join(path_utils.get_project_root(), "src", "sovereign_dashboard.py")
+        subprocess.Popen([VENV_PYTHON, script_path])
+    except Exception as e:
+        print(f"[!] Failed to launch dashboard: {e}")
+
+def report():
+    """Generates a security report."""
+    print("📋 Generating Security Report...")
+    # Logic for generating report could be added here
+    print("[i] Report feature coming soon or check logs via ./sovereign logs")
+
+def uninstall_wizard():
+    """Guides user through uninstallation."""
+    print("🗑️ Sovereign Guard Uninstall Wizard")
+    confirm = input("Confirm uninstallation? (y/N): ")
+    if confirm.lower() == 'y':
+        # Logic for uninstalling
+        print("[!] Logic for uninstallation would be implemented here.")
+
 def main():
     COMMANDS = {
         'start': start, 'stop': stop, 'status': status, 'dev': dev_mode,
         'secure': secure_mode, 'scan': scan_now, '2fa': setup_2fa,
         'restart': lambda: (stop(), time.sleep(1), start()),
-        'restart': lambda: (stop(), time.sleep(1), start()),
         'logs': view_logs,
         'bootstrap': bootstrap,
-        'clean': lambda: [os.remove(path_utils.get_log_file(l)) for l in ["guard_monitor.log", "guard_watchdog.out", "guard_monitor.out", "guard_monitor.err", "guard_watchdog.err"] if os.path.exists(path_utils.get_log_file(l))]
+        'clean': clean_logs,
+        'dashboard': dashboard,
+        'report': report,
+        'uninstall': uninstall_wizard
     }
     
     if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
