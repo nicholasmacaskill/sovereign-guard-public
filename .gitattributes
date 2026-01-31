@@ -3,24 +3,27 @@
 *.swift linguist-language=Swift
 SovereignNative/** linguist-vendored=false
 
-# Sovereign Guard: Proprietary Moat (Encrypted)
-SovereignNative/** filter=git-crypt diff=git-crypt
-docs/ENCRYPTION_STRATEGY.md filter=git-crypt diff=git-crypt
-src/sovereign_core.py filter=git-crypt diff=git-crypt
-src/sovereign_engine/patterns.py filter=git-crypt diff=git-crypt
-src/sovereign_engine/analyzer.py filter=git-crypt diff=git-crypt
-src/learning_engine.py filter=git-crypt diff=git-crypt
-tools/ai_forensics.py filter=git-crypt diff=git-crypt
-src/watchdog.py filter=git-crypt diff=git-crypt
-src/guard_monitor.py !filter !diff
+# Sovereign Guard: Public Logic Layer (Unsealed)
+# Proprietary patterns are redacted in the public repository.
+src/sovereign_core.py !filter !diff
+src/sovereign_engine/patterns.py !filter !diff
+src/sovereign_engine/analyzer.py !filter !diff
 src/sovereign_engine/scanners.py !filter !diff
 src/sovereign_engine/persistence.py !filter !diff
-.env.sovereign filter=git-crypt diff=git-crypt
-data/whitelist_master.json filter=git-crypt diff=git-crypt
-docs/MARKETING_COPY.md filter=git-crypt diff=git-crypt
-docs/STARTUP_PITCH.md filter=git-crypt diff=git-crypt
+src/learning_engine.py !filter !diff
+tools/ai_forensics.py !filter !diff
+src/watchdog.py !filter !diff
+src/guard_monitor.py !filter !diff
+.env.sovereign !filter !diff
+data/whitelist_master.json !filter !diff
 
-# Sovereign Guard: Public Interfaces & Utilities (Unsealed for Trust)
+# Sovereign Guard: Native Components
+SovereignNative/** !filter !diff
+
+# Sovereign Guard: Documentation
+docs/** !filter !diff
+
+# Sovereign Guard: Public Interfaces & Utilities
 src/sovereign_dashboard.py !filter !diff
 src/sovereign_ctl.py !filter !diff
 tools/audit_system.py !filter !diff
@@ -30,4 +33,3 @@ src/path_utils.py !filter !diff
 src/test_suite.py !filter !diff
 sovereign !filter !diff
 README.md !filter !diff
-
