@@ -8,7 +8,7 @@ Sovereign Guard fills that gap by policing the *execution context* rather than j
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 Sovereign Guard operates as a multi-layered defensive shell around your sensitive applications.
 
@@ -32,7 +32,7 @@ graph TD
 
 ---
 
-## 🧩 The 2026 Threat Landscape
+## The 2026 Threat Landscape
 
 In 2026, account hijacking has evolved beyond simple cookie theft. Attackers now leverage:
 
@@ -44,7 +44,7 @@ Sovereign Guard neutralizes these threats instantly through **Real-Time Context 
 
 ---
 
-## 🛡️ Key Features
+## Key Features
 
 ### Active Defense
 -   **Anti-Hijack Sentry**: Instantly terminates browsers launched via unauthorized scripts or with hidden debug flags.
