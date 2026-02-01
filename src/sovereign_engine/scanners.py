@@ -165,3 +165,49 @@ def scan_browser_history():
             pass
             
     return threats
+
+def check_active_tabs():
+    """
+    Checks active tabs in major browsers for malicious URLs via AppleScript (macOS only).
+    """
+    threats = []
+    if platform.system() != 'Darwin': return threats
+    
+    scripts = {
+        "Google Chrome": 'tell application "Google Chrome" to get URL of active tab of first window',
+        "Chromium": 'tell application "Chromium" to get URL of active tab of first window',
+        "Brave Browser": 'tell application "Brave Browser" to get URL of active tab of first window',
+        "Safari": 'tell application "Safari" to get URL of current tab of front window',
+        "Microsoft Edge": 'tell application "Microsoft Edge" to get URL of active tab of first window',
+        "Arc": 'tell application "Arc" to get URL of active tab of first window'
+    }
+    
+    for browser, script in scripts.items():
+        try:
+            # Check if browser is running first
+            # We check both the full name and the first word (e.g. "Brave", "Chrome")
+            short_name = browser.replace(" Browser", "").replace("Google ", "")
+            check_running = subprocess.run(['pgrep', '-if', f"^{short_name}"], capture_output=True)
+            if check_running.returncode != 0 and browser != "Safari":
+                continue
+
+            res = subprocess.run(['osascript', '-e', script], capture_output=True, text=True, timeout=2)
+            if res.returncode == 0:
+                url = res.stdout.strip()
+                if not url: continue
+                
+                for pattern in patterns.MALICIOUS_LINKS:
+                    if re.search(pattern, url, re.IGNORECASE):
+                        threats.append({
+                            "type": "MALICIOUS_LINK",
+                            "severity": "CRITICAL",
+                            "title": "🚨 MALICIOUS LINK DETECTED",
+                            "summary": f"You are currently viewing a known malicious site in {browser}: {url}",
+                            "url": url,
+                            "browser": browser
+                        })
+                        break
+        except:
+            continue
+            
+    return threats

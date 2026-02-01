@@ -334,6 +334,7 @@ def monitor_loop():
     browser_persistence_baseline, _ = core.check_browser_persistence(last_state=None)
     last_persistence_check = time.time()
     last_mitm_check = time.time()
+    last_tab_check = time.time()
     
     was_safe_mode = False
     
@@ -361,6 +362,14 @@ def monitor_loop():
             if time.time() - last_mitm_check > 60:
                 run_mitm_sequence()
                 last_mitm_check = time.time()
+
+            if time.time() - last_tab_check > 10:
+                active_tab_threats = core.check_active_tabs()
+                for t in active_tab_threats:
+                    print(f"\n{t['title']}: {t['summary']}")
+                    logger.warning(f"Active Tab Threat: {t['summary']}")
+                    notify_alert(t['title'], t['summary'])
+                last_tab_check = time.time()
 
             # 3. Process & Network Scan
             scanned_pids = set()
@@ -396,6 +405,8 @@ def monitor_loop():
                          print(f"\n{t['title']}: {t['summary']}")
                          logger.warning(f"History Threat: {t['summary']}")
                          notify_alert(t['title'], t['summary'])
+                         
+
                          
                 notify_alert("Sovereign Guard Status", f"Guard active in {current_mode} mode.")
                 last_hourly_notify = time.time()

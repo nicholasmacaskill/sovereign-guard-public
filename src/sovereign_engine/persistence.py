@@ -65,6 +65,29 @@ def check_vault_access(proc):
         pass
     return None
 
+def resolve_service_worker_origin(base_path, script_id):
+    """
+    Attempts to resolve the origin (website) for a given Service Worker script ID.
+    Looks in Chrome/Brave/Edge internal LevelDB logs.
+    """
+    db_path = os.path.join(base_path, 'Service Worker', 'Database')
+    if not os.path.exists(db_path):
+        return None
+
+    try:
+        import subprocess
+        # Search for the script ID in the LevelDB logs to find the associated origin
+        cmd = f"grep -r '{script_id}' '{db_path}' | head -n 5"
+        res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        if res.returncode == 0 and res.stdout:
+            # Look for patterns like https://domain.com
+            origins = re.findall(r'https?://[a-zA-Z0-9\-\.]+\.[a-z]{2,}', res.stdout)
+            if origins:
+                return origins[0]
+    except:
+        pass
+    return None
+
 def check_browser_persistence(last_state=None):
     """
     Checks for persistence in Browser Service Workers and Hosted Apps.
@@ -85,7 +108,7 @@ def check_browser_persistence(last_state=None):
     
     for base in browser_base_paths:
         if not os.path.exists(base): continue
-        browser_name = base.split('/')[-2] # e.g. 'Google', 'BraveSoftware' -> imperfect but works for alerting
+        browser_name = base.split('/')[-2] # e.g. 'Google', 'BraveSoftware'
         
         for subdir in patterns.BROWSER_PERSISTENCE_DIRS: # Service Worker, Hosted App Data
             target_dir = os.path.join(base, subdir)
@@ -94,27 +117,38 @@ def check_browser_persistence(last_state=None):
             # Walk the directory to get a state hash/mtime
             try:
                 for root, _, files in os.walk(target_dir):
-                    print(f"DEBUG: Walking {target_dir} -> {files}")
                     for file in files:
                         full_path = os.path.join(root, file)
                         mtime = os.path.getmtime(full_path)
                         state_key = f"{browser_name}:{subdir}:{file}"
                         current_state[state_key] = mtime
-                        print(f"DEBUG: Key {state_key}")
                         
                         if last_state:
                             if state_key not in last_state:
                                 # Whitelist check for common storage noise (ldb, log, etc)
-                                is_safe = any(re.search(p, file) for p in patterns.BROWSER_STORAGE_SAFE_PATTERNS)
-                                if is_safe:
+                                is_safe_ext = any(re.search(p, file) for p in patterns.BROWSER_STORAGE_SAFE_PATTERNS)
+                                if is_safe_ext:
                                     continue
 
+                                # Smart Whitelist: Resolve the origin
+                                origin = None
+                                if subdir == 'Service Worker' and '_' in file:
+                                    script_id = file.split('_')[0]
+                                    origin = resolve_service_worker_origin(base, script_id)
+                                
+                                if origin:
+                                    is_trusted = any(t in origin for t in patterns.TRUSTED_BROWSER_ORIGINS)
+                                    if is_trusted:
+                                        # Trusted origin -> Auto-whitelist
+                                        continue
+
                                 # New Service Worker/App Data file -> POTENTIAL PERSISTENCE
+                                origin_disp = f" ({origin})" if origin else ""
                                 threats.append({
                                     "type": "BROWSER_PERSISTENCE",
                                     "severity": "MEDIUM",
                                     "title": "👻 BROWSER GHOST DETECTED",
-                                    "summary": f"New {subdir} detected in {browser_name}: {file}",
+                                    "summary": f"New {subdir} detected in {browser_name}{origin_disp}: {file}",
                                     "path": full_path
                                 })
                             elif mtime > last_state[state_key]:

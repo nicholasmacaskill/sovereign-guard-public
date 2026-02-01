@@ -106,8 +106,23 @@ SENSITIVE_KEY_PATTERN = r'-----BEGIN (?:RSA|OPENSSH) PRIVATE KEY-----|AKIA[A-Z0-
 URL_SPOOF_PATTERN = r'https?://[^@\s]+:[^@\s]+@|https?://[^\s]+\.(?:zip|exe|dmg|pkg|scr)(?:\s|$)'
 PASTEJACKING_PATTERN = r'(?:\x1b\[[0-9;]*[a-zA-Z]|curl\s+[^\|]+\|\s*sh|powershell\s+-enc|cmd\.exe\s+/c|base64\s+-d|echo\s+[^\n]+\|\s*base64)'
 KNOWN_INFOSTEALERS = [
-    r'REDACTED_MALICIOUS_DOMAIN_1', r'REDACTED_MALICIOUS_DOMAIN_2', 
-    r'pixel\.facebook\.com', r'google-analytics\.com' 
+    r'REDACTED_MALICIOUS_DOMAIN_1', r'REDACTED_MALICIOUS_DOMAIN_2', r'pixel\.facebook\.com', r'google-analytics\.com' # Common trackers often abused/spoofed, plus specific malware domains
+]
+
+TRUSTED_BROWSER_ORIGINS = [
+    'google.com', 'github.com', 'slack.com', 'microsoft.com', 
+    'apple.com', 'amazon.com', 'netflix.com', 'facebook.com',
+    'incorpdirect.ca'
+]
+
+MALICIOUS_LINKS = [
+    r'https?://(?:www\.)?malicious-site\.com',
+    r'https?://(?:www\.)?phish-login\.net',
+    r'https?://(?:www\.)?account-verify-secure\.xyz',
+    r'https?://[^/]+\.scr$',  # Direct downloads of screensavers
+    r'https?://[^/]+\.dmg$',  # Direct downloads (warn on these specifically)
+    r'https?://[^/]+\.pkg$',
+    r'https?://[^/]+\.zip$'
 ]
 BROWSER_PERSISTENCE_DIRS = [
     'Service Worker', 'Hosted App Data', 'Local Storage'
