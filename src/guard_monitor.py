@@ -41,13 +41,14 @@ logger.setLevel(logging.INFO)
 logger.addHandler(handler)
 
 
-def notify_alert(title, message):
+def notify_alert(title, message, sound=None):
     """Triggers a desktop notification."""
     try:
         if sys.platform == "darwin":
             safe_title = title.replace('\\', '\\\\').replace('"', '\\"')
             safe_message = message.replace('\\', '\\\\').replace('"', '\\"')
-            script = f'display notification "{safe_message}" with title "{safe_title}"'
+            sound_str = f'sound name "{sound}"' if sound else 'sound name ""'
+            script = f'display notification "{safe_message}" with title "{safe_title}" {sound_str}'
             subprocess.run(["osascript", "-e", script], check=False)
             return
 
@@ -56,16 +57,10 @@ def notify_alert(title, message):
         logger.error(f"Failed to send notification: {e}")
 
 def speak(text):
-    """Speaks text using a calm female voice (macOS), with debounce."""
-    global LAST_SPOKEN_TIME
-    try:
-        now = time.time()
-        if now - LAST_SPOKEN_TIME < VOICE_COOLDOWN:
-            return
-        subprocess.Popen(['say', '-v', 'Samantha', '-r', '160', text])
-        LAST_SPOKEN_TIME = now
-    except:
-        pass
+    """Speaks text using a calm female voice (macOS), with debounce. [MUTED]"""
+    # Vocal warnings disabled - using silent notifications instead
+    pass
+
 
 def check_safe_mode():
     """Checks if Developer Mode is active and VERIFIES the authorization secret."""
@@ -244,7 +239,7 @@ def run_browser_persistence_sequence(baseline):
             speak(f"Security Alert. New browser persistence module detected in {os.path.basename(os.path.dirname(t['path']))}.")
     return new_baseline
 
-def scan_single_process(proc, is_safe_mode, current_mode, seen_pids, scanned_pids):
+def scan_single_process(proc, is_safe_mode, current_mode, seen_pids, scanned_pids, run_memory_scan=False):
     """Performs deep security analysis on a single process."""
     try:
         pid = proc.pid
@@ -252,6 +247,30 @@ def scan_single_process(proc, is_safe_mode, current_mode, seen_pids, scanned_pid
         
         if pid in scanned_pids: return 0
         scanned_pids.add(pid)
+        
+        # Injection Defense: Memory Scanning (only when triggered)
+        if run_memory_scan and core.ENABLE_MEMORY_SCANNING:
+            memory_threat = core.scan_process_memory(proc)
+            if memory_threat:
+                msg = f"\n{memory_threat['title']}: {memory_threat['summary']}"
+                print(msg)
+                logger.critical(msg)
+                notify_alert(memory_threat['title'], memory_threat['summary'], sound="Basso")
+                speak("Critical alert. Process injection detected in browser.")
+                if not is_safe_mode:
+                    try:
+                        proc.kill()
+                        print(f"    [!] NEUTRALIZED: '{name}' terminated due to injection.")
+                    except: pass
+        
+        # Module/Library Verification
+        if run_memory_scan and core.ENABLE_MEMORY_SCANNING:
+            module_threat = core.verify_process_modules(proc)
+            if module_threat:
+                msg = f"\n{module_threat['title']}: {module_threat['summary']}"
+                print(msg)
+                logger.warning(msg)
+                notify_alert(module_threat['title'], module_threat['summary'])
         
         # 1. Vault Guard
         vault_threat = core.check_vault_access(proc)
@@ -336,6 +355,12 @@ def monitor_loop():
     last_mitm_check = time.time()
     last_tab_check = time.time()
     
+    # Initialize Injection Defense Timers
+    last_memory_scan = time.time()
+    last_integrity_check = time.time()
+    last_launch_services_check = time.time()
+    last_keychain_check = time.time()
+    
     was_safe_mode = False
     
     try:
@@ -371,14 +396,48 @@ def monitor_loop():
                     notify_alert(t['title'], t['summary'])
                 last_tab_check = time.time()
 
+            # 2.5 Injection Defense Sequences
+            # Binary Integrity Check (every 5 minutes)
+            if core.ENABLE_BINARY_VERIFICATION and time.time() - last_integrity_check > core.INTEGRITY_CHECK_INTERVAL:
+                integrity_threats = core.verify_binary_integrity()
+                for t in integrity_threats:
+                    print(f"\n{t['title']}: {t['summary']}")
+                    logger.critical(f"Binary Integrity: {t['summary']}")
+                    notify_alert(t['title'], t['summary'], sound="Basso")
+                    speak("Critical security alert. Browser binary has been tampered with.")
+                last_integrity_check = time.time()
+            
+            # Launch Services Monitor (every 2 minutes)
+            if core.ENABLE_LAUNCH_SERVICES_MONITOR and time.time() - last_launch_services_check > core.LAUNCH_SERVICES_CHECK_INTERVAL:
+                ls_threats = core.check_launch_services()
+                for t in ls_threats:
+                    print(f"\n{t['title']}: {t['summary']}")
+                    logger.warning(f"Launch Services: {t['summary']}")
+                    notify_alert(t['title'], t['summary'])
+                last_launch_services_check = time.time()
+            
+            # Keychain Access Monitor (every 30 seconds)
+            if core.ENABLE_KEYCHAIN_MONITORING and time.time() - last_keychain_check > core.KEYCHAIN_MONITOR_INTERVAL:
+                keychain_threats = core.monitor_keychain_access()
+                for t in keychain_threats:
+                    print(f"\n{t['title']}: {t['summary']}")
+                    logger.warning(f"Keychain Access: {t['summary']}")
+                    notify_alert(t['title'], t['summary'], sound="Ping")
+                last_keychain_check = time.time()
+
             # 3. Process & Network Scan
             scanned_pids = set()
             scanned_count = 0
             
+            # Determine if we should run memory scans this iteration
+            run_memory_scan = core.ENABLE_MEMORY_SCANNING and (time.time() - last_memory_scan > core.MEMORY_SCAN_INTERVAL)
+            if run_memory_scan:
+                last_memory_scan = time.time()
+            
             try:
                 for proc in psutil.process_iter(['pid', 'name']):
                     try:
-                        scanned_count += scan_single_process(proc, is_safe_mode, current_mode, seen_pids, scanned_pids)
+                        scanned_count += scan_single_process(proc, is_safe_mode, current_mode, seen_pids, scanned_pids, run_memory_scan)
                     except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, OSError):
                         continue
             except Exception as e:

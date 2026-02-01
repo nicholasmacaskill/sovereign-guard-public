@@ -62,7 +62,7 @@ SAFE_BROWSER_PATHS = [
     '/Applications/Vivaldi.app/Contents/Frameworks'  # Vivaldi Helper processes
 ]
 
-TRUSTED_NETWORKS = ['127.0.0.1', '::1', '192.168.', '10.', '172.16.']
+TRUSTED_NETWORKS = ['REDACTED_INTERNAL_SUBNETS']
 TRUSTED_DOMAINS = ['google.com', 'github.com', 'apple.com', 'localhost']
 
 REVERSE_SHELL_PORTS = [4444, 1337, 8888, 9001]
@@ -96,33 +96,30 @@ DEBUG_PORTS = [9222, 9229]
 
 TRUSTED_BROWSER_PARENTS = ['launchd', 'Antigravity', 'Code', 'Finder']
 
-BTC_PATTERN = r'\b(?:[13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[ac-hj-np-z02-9]{11,71})\b'
-ETH_PATTERN = r'\b0x[a-fA-F0-9]{40}\b'
-CRYPTO_RE = re.compile(f"({BTC_PATTERN})|({ETH_PATTERN})")
+BTC_PATTERN = r'REDACTED_CRYPTO_PATTERN'
+ETH_PATTERN = r'REDACTED_CRYPTO_PATTERN'
+CRYPTO_RE = re.compile(r'REDACTED_CRYPTO_REGEX')
 
-CMD_INJECTION_PATTERN = r'(?:curl|wget)\s+https?://[^\s]+\s*\|\s*(?:bash|sh|zsh|python)'
-MALICIOUS_JS_PATTERN = r'eval\(atob\([\'"][^\'"]+[\'"]\)\)|String\.fromCharCode\(\d+(?:,\s*\d+){5,}\)'
-SENSITIVE_KEY_PATTERN = r'-----BEGIN (?:RSA|OPENSSH) PRIVATE KEY-----|AKIA[A-Z0-9]{16}|(?:^|[^a-fA-F0-9])[a-f0-9]{64}(?:[^a-fA-F0-9]|$)'
-URL_SPOOF_PATTERN = r'https?://[^@\s]+:[^@\s]+@|https?://[^\s]+\.(?:zip|exe|dmg|pkg|scr)(?:\s|$)'
-PASTEJACKING_PATTERN = r'(?:\x1b\[[0-9;]*[a-zA-Z]|curl\s+[^\|]+\|\s*sh|powershell\s+-enc|cmd\.exe\s+/c|base64\s+-d|echo\s+[^\n]+\|\s*base64)'
+CMD_INJECTION_PATTERN = r'REDACTED_CMD_INJECTION_PATTERN'
+MALICIOUS_JS_PATTERN = r'REDACTED_MALICIOUS_JS_PATTERN'
+SENSITIVE_KEY_PATTERN = r'REDACTED_SENSITIVE_KEY_PATTERN'
+URL_SPOOF_PATTERN = r'REDACTED_URL_SPOOF_PATTERN'
+PASTEJACKING_PATTERN = r'REDACTED_PASTEJACKING_PATTERN'
 KNOWN_INFOSTEALERS = [
-    r'REDACTED_MALICIOUS_DOMAIN_1', r'REDACTED_MALICIOUS_DOMAIN_2', r'pixel\.facebook\.com', r'google-analytics\.com' # Common trackers often abused/spoofed, plus specific malware domains
+    r'REDACTED_THREAT_INTEL_DOMAIN_1', 
+    r'REDACTED_THREAT_INTEL_DOMAIN_2'
 ]
 
 TRUSTED_BROWSER_ORIGINS = [
     'google.com', 'github.com', 'slack.com', 'microsoft.com', 
     'apple.com', 'amazon.com', 'netflix.com', 'facebook.com',
-    'incorpdirect.ca'
+    'REDACTED_PARTNER_DOMAIN'
 ]
 
 MALICIOUS_LINKS = [
-    r'https?://(?:www\.)?malicious-site\.com',
-    r'https?://(?:www\.)?phish-login\.net',
-    r'https?://(?:www\.)?account-verify-secure\.xyz',
-    r'https?://[^/]+\.scr$',  # Direct downloads of screensavers
-    r'https?://[^/]+\.dmg$',  # Direct downloads (warn on these specifically)
-    r'https?://[^/]+\.pkg$',
-    r'https?://[^/]+\.zip$'
+    r'REDACTED_MALICIOUS_LINK_PATTERN_1',
+    r'REDACTED_MALICIOUS_LINK_PATTERN_2',
+    r'REDACTED_MALICIOUS_FILE_EXTENSIONS'
 ]
 BROWSER_PERSISTENCE_DIRS = [
     'Service Worker', 'Hosted App Data', 'Local Storage', 'Extensions'
@@ -139,8 +136,14 @@ RISKY_EXTENSION_PERMISSIONS = [
     '<all_urls>', 'http://*/*', 'https://*/*', 'tabs', 'debugger', 'webRequest', 'webRequestBlocking', 'storage', 'proxy'
 ]
 
+SUSPICIOUS_EXTENSION_KEYWORDS = [
+    'free vpn', 'unlimited vpn', 'video downloader', 'mega search', 'coupon finder',
+    'easy social', 'adblocker+', 'dark mode for all', 'custom cursor', 'tab manager+'
+]
+
 BROWSER_STORAGE_SAFE_PATTERNS = [
-    r'\.ldb$', r'\.log$', r'\.tmp$', r'^MANIFEST-', r'^CURRENT$', r'^LOCK$', r'^LOG$', r'^LOG\.old$'
+    r'\.ldb$', r'\.log$', r'\.tmp$', r'^MANIFEST-', r'^CURRENT$', r'^LOCK$', r'^LOG$', r'^LOG\.old$',
+    r'^[a-f0-9]{16}_\d+$'  # Chrome ScriptCache files
 ]
 
 CLIPBOARD_WHITELIST = [r'^https?://', r'^[a-f0-9]{8}-[a-f0-9]{4}-']
@@ -155,3 +158,54 @@ THREAT_PATTERNS = {
 }
 
 STRICT_MODE_THREATS = ["CMD_INJECTION", "MALICIOUS_JS", "CRYPTO_SWAP", "PASTEJACKING"]
+
+# ============================================================================
+# INJECTION DEFENSE PATTERNS
+# ============================================================================
+
+# Binary Integrity - SHA256 hashes (auto-populated on first run)
+BROWSER_BINARY_HASHES = {
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome': None,
+    '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser': None,
+    '/Applications/Arc.app/Contents/MacOS/Arc': None,
+    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge': None,
+    '/Applications/Safari.app/Contents/MacOS/Safari': None,
+    '/System/Applications/Safari.app/Contents/MacOS/Safari': None,
+}
+
+# Trusted library paths for module verification (macOS)
+TRUSTED_LIBRARY_PATHS = [
+    '/System/Library/',
+    '/usr/lib/',
+    '/Applications/Google Chrome.app/',
+    '/Applications/Brave Browser.app/',
+    '/Applications/Arc.app/',
+    '/Applications/Microsoft Edge.app/',
+    '/Applications/Safari.app/',
+    '/Library/Apple/',
+]
+
+# Suspicious memory patterns indicating injection
+INJECTION_MEMORY_PATTERNS = [
+    rb'REDACTED_MEMORY_PATTERN_1',
+    rb'REDACTED_MEMORY_PATTERN_2',
+    rb'REDACTED_MEMORY_PATTERN_3',
+    rb'REDACTED_MEMORY_PATTERN_4',
+    rb'REDACTED_MEMORY_PATTERN_5',
+]
+
+# Keychain access thresholds
+MAX_KEYCHAIN_READS_PER_MINUTE = 50  # Normal browser: ~10-20 accesses per minute
+
+# Injection defense configuration (can be overridden via env vars)
+MEMORY_SCAN_INTERVAL = int(os.getenv('MEMORY_SCAN_INTERVAL', '60'))           # seconds
+INTEGRITY_CHECK_INTERVAL = int(os.getenv('INTEGRITY_CHECK_INTERVAL', '300'))   # seconds
+LAUNCH_SERVICES_CHECK_INTERVAL = int(os.getenv('LAUNCH_SERVICES_CHECK_INTERVAL', '120'))  # seconds
+KEYCHAIN_MONITOR_INTERVAL = int(os.getenv('KEYCHAIN_MONITOR_INTERVAL', '30'))  # seconds
+
+# Feature flags
+ENABLE_MEMORY_SCANNING = os.getenv('ENABLE_MEMORY_SCANNING', 'true').lower() == 'true'
+ENABLE_BINARY_VERIFICATION = os.getenv('ENABLE_BINARY_VERIFICATION', 'true').lower() == 'true'
+ENABLE_LAUNCH_SERVICES_MONITOR = os.getenv('ENABLE_LAUNCH_SERVICES_MONITOR', 'true').lower() == 'true'
+ENABLE_KEYCHAIN_MONITORING = os.getenv('ENABLE_KEYCHAIN_MONITORING', 'true').lower() == 'true'
+

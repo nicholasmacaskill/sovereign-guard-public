@@ -4,13 +4,13 @@
 
 Sovereign Guard is a high-fidelity, zero-trust security perimeter designed to protect modern workstations against the 2026 threat landscape. While 2024-era protections like **Device Bound Session Credentials (DBSC)** secured cookies to hardware, they left a massive blind spot: **Local Environment Exploitation.**
 
-Sovereign Guard fills that gap by policing the *execution context* rather than just the *credential*.
+Sovereign Guard fills that gap by policing the *execution context* rather than just the *credential*. It ensures that even if an attacker has physical or remote access to your machine, they cannot hijack your active sessions or exfiltrate sensitive data.
 
 ---
 
 ## System Architecture
 
-Sovereign Guard operates as a multi-layered defensive shell around your sensitive applications.
+Sovereign Guard operates as a multi-layered defensive shell around your sensitive applications. It combines real-time process monitoring, forensic directory auditing, and deep browser introspection.
 
 ```mermaid
 graph TD
@@ -30,80 +30,110 @@ graph TD
     SG -- Terminate / Revert --> Apps
 ```
 
+### Core Components
+-   **Watchdog Supervisor**: A resilient background process that ensures the Guard Monitor is always running and tampered-proof.
+-   **Guard Monitor**: The central engine that orchestrates the scanning loop, handles alerts, and executes protection maneuvers.
+-   **Modular Scanners**: Plug-and-play forensic modules targeting specific attack vectors (Persistence, Clipboard, Network, Browser).
+
+---
+
+## 🛡️ Key Features & Protections
+
+### 1. Anti-Hijack Sentry
+Modern session hijacking often involves launching a legitimate browser with the `--remote-debugging-port` flag.
+-   **Sentry Logic**: Instantly terminates any browser process launched with dangerous debug flags or by untrusted parent processes.
+-   **Sandbox Enforcement**: Flags and blocks browsers running without a sandbox (`--no-sandbox`).
+
+### 2. Smart Clipboard Fortress
+Protects against **Pastejacking** and **Crypto Clippers**.
+-   **Pastejacking Protection**: Sanitizes the clipboard to remove hidden, malicious terminal commands (e.g., ANSI escape sequences or `curl | sh` pipes).
+-   **Crypto Restoration**: Specifically monitors for the replacement of BTC/ETH addresses in the clipboard and reverts them to the original intended address.
+
+### 3. "Ghost" Persistence Monitor
+Attacks in 2026 rely on **Shadow Persistence** via Service Workers and Hosted Apps.
+-   **Service Worker Audit**: Monitors browser internal directories for new Service Worker registrations.
+-   **Smart Whitelisting**: Resolves the origin (URL) of new Service Workers via internal LevelDB analysis. If the origin is a high-trust domain (Google, GitHub, etc.), it is automatically whitelisted to reduce noise.
+-   **Extension Sentry**: Scans the `manifest.json` of all installed extensions for high-risk permissions like `<all_urls>`, `debugger`, and `webRequestBlocking`.
+
+### 4. Active Tab & Link Detection
+Real-time monitoring of your active browsing environment.
+-   **Tab Monitoring**: Uses AppleScript (on macOS) to query the active tab's URL across all supported browsers (Arc, Brave, Chrome, Edge, Safari).
+-   **Malicious Link Block**: Warns you instantly if you navigate to a known malicious domain or attempt to download high-risk file types (.scr, .dmg, .pkg, .zip) from untrusted sources.
+
+### 5. Advanced Injection Defense (New for 2026)
+Protects against sophisticated malware running *inside* your trusted applications.
+-   **Process Memory Scanner**: Periodically scans browser memory for injected executable code (RWX regions, suspicious eval(), or shellcode).
+-   **Binary Code Integrity**: Verifies SHA-256 hashes of browser binaries every 5 minutes to detect tampering or "trojanized" updates.
+-   **Module Verification**: Blocks the loading of unsigned or untrusted dynamic libraries (.dylib/.dll) into the browser process space.
+-   **Launch Services Monitor**: (macOS) Detects if the default browser handler has been silently hijacked by a malicious wrapper.
+-   **Keychain Anomaly Detection**: Uses behavioral analysis to flag processes accessing keychain items at superhuman speeds (>50 reads/min).
+
 ---
 
 ## The 2026 Threat Landscape
 
-In 2026, account hijacking has evolved beyond simple cookie theft. Attackers now leverage:
-
-1.  **"Inside-Out" Bypasses**: Malware launching legitimate browsers with `--remote-debugging-port` to clone user sessions remotely, bypassing hardware-bound cookies.
-2.  **Smart Clippers**: Highly optimized "Click-Fix" scripts that swap crypto addresses or sensitive secrets in the milliseconds between Copy and Paste.
-3.  **Shadow Persistence**: Malicious Service Workers and Hosted App Data that "haunt" your browser folders long after you leave a site.
-
-Sovereign Guard neutralizes these threats instantly through **Real-Time Context Forensic Analysis.**
-
----
-
-## Key Features
-
-### Active Defense
--   **Anti-Hijack Sentry**: Instantly terminates browsers launched via unauthorized scripts or with hidden debug flags.
--   **Clipboard Fortress**: Reverts "Click-Fix" address swaps and sanitizes malicious command injections (e.g., hidden `curl | sh` pipes).
--   **Ghost Monitor**: Scans the `Service Worker` and `Local Storage` depths of your browser to detect hidden backdoors. Total support for **Arc, Brave, Chrome, and Edge.**
--   **Infostealer Forensic**: Deep-scans browser history to detect known infosteraler gateways and malicious landing pages before they exfiltrate data.
-
-### Intelligence & Forensic
--   **7-Day Learning Phase**: Builds a personalized "Trusted Baseline" of your specific behavior.
--   **Agentic Forensic Reporting**: Whenever a threat is blocked, a local AI-powered report (via Ollama) explains exactly *what* happened and *why* it was blocked.
--   **Supply Chain Sentinel**: Watches your developer environment for typosquatting packages and suspicious `venv` modifications.
+In 2026, account hijacking has evolved beyond simple cookie theft. Sovereign Guard is built to neutralize:
+1.  **"Inside-Out" Bypasses**: Malware launching legitimate browsers to clone user sessions remotely.
+2.  **Smart Clippers**: Highly optimized scripts that swap secrets in the milliseconds between Copy and Paste.
+3.  **Shadow Persistence**: Malicious background scripts that "haunt" browser profiles long after a site is closed.
 
 ---
 
 ## ✅ Verification & Trust
 
-Sovereign Guard is **Audit-Proven.** In the January 2026 E2E Security Audit, the system maintained a 100% success rate against active exploitation attempts:
+Sovereign Guard is **Audit-Proven.** Our Playwright-based E2E audit suite verifies the system's effectiveness against real attack simulations.
 
 | Attack Vector | Guard Response | Result |
 | :--- | :--- | :--- |
 | **Debug Hijack** | Browser Termination | ✅ BLOCK |
+| **Process Injection** | Memory Kill | ✅ NEUTRALIZE |
 | **Pastejacking** | Buffer Sanitation | ✅ CLEAN |
 | **Crypto Clipper** | Address Restoration | ✅ PROTECT |
 | **Reverse Shell** | Connection Severed | ✅ KILL |
 | **Shadow Persistence**| Entry Purged | ✅ CLEAN |
+| **Browser Tampering** | Integrity Alert | ✅ DETECT |
+| **Malicious Links** | Active Notification | ✅ WARN |
 
 > [!IMPORTANT]
-> This suite uses **Source Redaction** to protect proprietary threat intelligence. While the logic is open-source (The "Glass"), the specific signature lists (The "Moat") are redacted in the public repository to prevent bypass discovery.
+> **Source Redaction Layer**: To protect our proprietary threat intelligence, this public repository uses a "Redacted Core" model. The scanning logic is fully transparent, but specific malware domain lists and signature patterns are replaced with `REDACTED` placeholders. For the full, unredacted intelligence suite, authorized users should refer to the [Private Repository](https://github.com/nicholasmacaskill/sovereign-guard-private).
 
 ---
 
 ## 🚀 Quick Start
 
-**1. Install & Setup**
-```bash
-./setup.sh
-```
+### Installation
+1.  **Clone the Repository**:
+    ```bash
+    git clone https://github.com/nicholasmacaskill/python-sovereign-guard.git
+    cd python-sovereign-guard
+    ```
+2.  **Initialize Environment**:
+    ```bash
+    ./setup.sh
+    ```
+3.  **Bootstrap the Baseline**:
+    Let the Guard scan your current clean state to build a "Trust Profile":
+    ```bash
+    ./sovereign bootstrap
+    ```
 
-**2. Bootstrap (Skip Learning)**
-Instantly scan your current environment to build a safety baseline:
-```bash
-./sovereign bootstrap
-```
-
-**3. Check Status**
-```bash
-./sovereign status
-```
-
----
-
-## ⌨️ Command Center
-
+### Command Center
 | Command | Description |
 | :--- | :--- |
 | `./sovereign start` | Launch the active monitor supervisor |
+| `./sovereign stop` | Gracefully shut down the security perimeter |
 | `./sovereign status` | View Trust Score, Mode, and Health |
-| `./sovereign logs` | View real-time security alerts |
-| `./sovereign scan` | Run a deep forensic audit of the OS |
-| `./sovereign dev` | Enter "Safe Mode" (Alerts only, no Killing) |
+| `./sovereign logs` | View real-time security alerts and blocked threats |
+| `./sovereign scan` | Perform a deep, manual forensic audit |
+| `./sovereign dev` | Enter "Safe Mode" (Alerts only, no active blocking) |
+
+---
+
+## 🛠️ Development & Auditing
+
+Sovereign Guard includes a comprehensive E2E audit suite powered by Playwright. To run the security simulations:
+```bash
+./venv/bin/python -m pytest tests/e2e/
+```
 
 **Stay Sovereign.**
