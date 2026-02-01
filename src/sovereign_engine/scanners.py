@@ -40,11 +40,9 @@ def scan_supply_chain(target_path="."):
 
 def scan_extensions():
     """Scans browser extensions for high-risk permissions."""
-    EXTENSION_PATHS = []
-    RISKY_PERMISSIONS = []
     risky_extensions = []
     
-    for base_path in EXTENSION_PATHS:
+    for base_path in patterns.BROWSER_EXTENSION_PATHS:
         if not os.path.exists(base_path): continue
         try:
             for ext_id in os.listdir(base_path):
@@ -59,9 +57,16 @@ def scan_extensions():
                     manifest = json.load(f)
                 perms = manifest.get('permissions', [])
                 for cs in manifest.get('content_scripts', []): perms.extend(cs.get('matches', []))
-                found_risks = [p for p in perms if p in RISKY_PERMISSIONS]
+                found_risks = [p for p in perms if p in patterns.RISKY_EXTENSION_PERMISSIONS]
                 if found_risks:
-                    risky_extensions.append({"type": "EXTENSION_RISK", "name": manifest.get('name', 'Unknown'), "id": ext_id, "risks": list(set(found_risks))})
+                    risky_extensions.append({
+                        "type": "EXTENSION_RISK", 
+                        "severity": "HIGH",
+                        "name": manifest.get('name', 'Unknown'), 
+                        "id": ext_id, 
+                        "risks": list(set(found_risks)),
+                        "path": manifest_path
+                    })
         except: continue
     return risky_extensions
 

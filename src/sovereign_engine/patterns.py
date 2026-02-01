@@ -125,7 +125,18 @@ MALICIOUS_LINKS = [
     r'https?://[^/]+\.zip$'
 ]
 BROWSER_PERSISTENCE_DIRS = [
-    'Service Worker', 'Hosted App Data', 'Local Storage'
+    'Service Worker', 'Hosted App Data', 'Local Storage', 'Extensions'
+]
+
+BROWSER_EXTENSION_PATHS = [
+    os.path.expanduser('~/Library/Application Support/Google/Chrome/Default/Extensions'),
+    os.path.expanduser('~/Library/Application Support/BraveSoftware/Brave-Browser/Default/Extensions'),
+    os.path.expanduser('~/Library/Application Support/Arc/User Data/Default/Extensions'),
+    os.path.expanduser('~/Library/Application Support/Microsoft Edge/Default/Extensions')
+]
+
+RISKY_EXTENSION_PERMISSIONS = [
+    '<all_urls>', 'http://*/*', 'https://*/*', 'tabs', 'debugger', 'webRequest', 'webRequestBlocking', 'storage', 'proxy'
 ]
 
 BROWSER_STORAGE_SAFE_PATTERNS = [

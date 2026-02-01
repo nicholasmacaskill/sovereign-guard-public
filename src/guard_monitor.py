@@ -405,6 +405,15 @@ def monitor_loop():
                          print(f"\n{t['title']}: {t['summary']}")
                          logger.warning(f"History Threat: {t['summary']}")
                          notify_alert(t['title'], t['summary'])
+
+                extension_threats = core.scan_extensions()
+                if extension_threats:
+                    for t in extension_threats:
+                        msg = f"🛡️ RISKY EXTENSION: {t['name']} ({t['id']})"
+                        print(f"\n{msg}")
+                        logger.warning(msg)
+                        notify_alert("Risky Browser Extension", f"{t['name']} has sensitive permissions: {t['risks']}")
+
                          
 
                          
