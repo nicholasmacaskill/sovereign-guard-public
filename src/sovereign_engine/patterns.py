@@ -62,7 +62,7 @@ SAFE_BROWSER_PATHS = [
     '/Applications/Vivaldi.app/Contents/Frameworks'  # Vivaldi Helper processes
 ]
 
-TRUSTED_NETWORKS = ['REDACTED_INTERNAL_SUBNETS']
+TRUSTED_NETWORKS = ['127.0.0.1', '::1', '192.168.', '10.', '172.16.']
 TRUSTED_DOMAINS = ['google.com', 'github.com', 'apple.com', 'localhost']
 
 REVERSE_SHELL_PORTS = [4444, 1337, 8888, 9001]
@@ -96,30 +96,33 @@ DEBUG_PORTS = [9222, 9229]
 
 TRUSTED_BROWSER_PARENTS = ['launchd', 'Antigravity', 'Code', 'Finder']
 
-BTC_PATTERN = r'REDACTED_CRYPTO_PATTERN'
-ETH_PATTERN = r'REDACTED_CRYPTO_PATTERN'
-CRYPTO_RE = re.compile(r'REDACTED_CRYPTO_REGEX')
+BTC_PATTERN = r'\b(?:[13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[ac-hj-np-z02-9]{11,71})\b'
+ETH_PATTERN = r'\b0x[a-fA-F0-9]{40}\b'
+CRYPTO_RE = re.compile(f"({BTC_PATTERN})|({ETH_PATTERN})")
 
-CMD_INJECTION_PATTERN = r'REDACTED_CMD_INJECTION_PATTERN'
-MALICIOUS_JS_PATTERN = r'REDACTED_MALICIOUS_JS_PATTERN'
-SENSITIVE_KEY_PATTERN = r'REDACTED_SENSITIVE_KEY_PATTERN'
-URL_SPOOF_PATTERN = r'REDACTED_URL_SPOOF_PATTERN'
-PASTEJACKING_PATTERN = r'REDACTED_PASTEJACKING_PATTERN'
+CMD_INJECTION_PATTERN = r'(?:curl|wget)\s+https?://[^\s]+\s*\|\s*(?:bash|sh|zsh|python)'
+MALICIOUS_JS_PATTERN = r'eval\(atob\([\'"][^\'"]+[\'"]\)\)|String\.fromCharCode\(\d+(?:,\s*\d+){5,}\)'
+SENSITIVE_KEY_PATTERN = r'-----BEGIN (?:RSA|OPENSSH) PRIVATE KEY-----|AKIA[A-Z0-9]{16}|(?:^|[^a-fA-F0-9])[a-f0-9]{64}(?:[^a-fA-F0-9]|$)'
+URL_SPOOF_PATTERN = r'https?://[^@\s]+:[^@\s]+@|https?://[^\s]+\.(?:zip|exe|dmg|pkg|scr)(?:\s|$)'
+PASTEJACKING_PATTERN = r'(?:\x1b\[[0-9;]*[a-zA-Z]|curl\s+[^\|]+\|\s*sh|powershell\s+-enc|cmd\.exe\s+/c|base64\s+-d|echo\s+[^\n]+\|\s*base64|IEX\s*\(|DownloadString|FromBase64String|mshta\s+|regsvr32\s+|rundll32\s+url\.dll|javascript:)'
 KNOWN_INFOSTEALERS = [
-    r'REDACTED_THREAT_INTEL_DOMAIN_1', 
-    r'REDACTED_THREAT_INTEL_DOMAIN_2'
+    r'ojrq\.net', r'trkn\.us', r'pixel\.facebook\.com', r'google-analytics\.com' # Common trackers often abused/spoofed, plus specific malware domains
 ]
 
 TRUSTED_BROWSER_ORIGINS = [
     'google.com', 'github.com', 'slack.com', 'microsoft.com', 
     'apple.com', 'amazon.com', 'netflix.com', 'facebook.com',
-    'REDACTED_PARTNER_DOMAIN'
+    'incorpdirect.ca'
 ]
 
 MALICIOUS_LINKS = [
-    r'REDACTED_MALICIOUS_LINK_PATTERN_1',
-    r'REDACTED_MALICIOUS_LINK_PATTERN_2',
-    r'REDACTED_MALICIOUS_FILE_EXTENSIONS'
+    r'https?://(?:www\.)?malicious-site\.com',
+    r'https?://(?:www\.)?phish-login\.net',
+    r'https?://(?:www\.)?account-verify-secure\.xyz',
+    r'https?://[^/]+\.scr$',  # Direct downloads of screensavers
+    r'https?://[^/]+\.dmg$',  # Direct downloads (warn on these specifically)
+    r'https?://[^/]+\.pkg$',
+    r'https?://[^/]+\.zip$'
 ]
 BROWSER_PERSISTENCE_DIRS = [
     'Service Worker', 'Hosted App Data', 'Local Storage', 'Extensions'
@@ -187,11 +190,11 @@ TRUSTED_LIBRARY_PATHS = [
 
 # Suspicious memory patterns indicating injection
 INJECTION_MEMORY_PATTERNS = [
-    rb'REDACTED_MEMORY_PATTERN_1',
-    rb'REDACTED_MEMORY_PATTERN_2',
-    rb'REDACTED_MEMORY_PATTERN_3',
-    rb'REDACTED_MEMORY_PATTERN_4',
-    rb'REDACTED_MEMORY_PATTERN_5',
+    rb'(?:eval|exec)\s*\(',           # Eval in unexpected memory
+    rb'CreateRemoteThread',            # Windows injection API
+    rb'NtCreateThreadEx',              # Low-level Windows injection
+    rb'ptrace',                        # Unix process tracing (can be used for injection)
+    rb'dlopen.*\.dylib',              # Dynamic library loading
 ]
 
 # Keychain access thresholds
