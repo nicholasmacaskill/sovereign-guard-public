@@ -230,7 +230,7 @@ def run_persistence_sequence(baseline):
 
 def run_browser_persistence_sequence(baseline):
     """Checks for browser persistence threats."""
-    new_baseline, threats = core.check_browser_persistence(last_state=baseline)
+    new_baseline, threats = core.check_browser_persistence()
     if threats:
         for t in threats:
             msg = f"\n{t['title']}: {t['summary']}"
@@ -350,7 +350,7 @@ def monitor_loop():
     
     # Initialize Hardening Baselines
     persistence_baseline, _ = core.check_persistence(last_files=None)
-    browser_persistence_baseline, _ = core.check_browser_persistence(last_state=None)
+    browser_persistence_baseline, _ = core.check_browser_persistence()
     last_persistence_check = time.time()
     last_mitm_check = time.time()
     last_tab_check = time.time()
@@ -388,13 +388,14 @@ def monitor_loop():
                 run_mitm_sequence()
                 last_mitm_check = time.time()
 
-            if time.time() - last_tab_check > 10:
-                active_tab_threats = core.check_active_tabs()
-                for t in active_tab_threats:
-                    print(f"\n{t['title']}: {t['summary']}")
-                    logger.warning(f"Active Tab Threat: {t['summary']}")
-                    notify_alert(t['title'], t['summary'])
-                last_tab_check = time.time()
+            # DISABLED: Active Tab Monitoring (Uses AppleScript which auto-launches Safari)
+            # if time.time() - last_tab_check > 10:
+            #     active_tab_threats = core.check_active_tabs()
+            #     for t in active_tab_threats:
+            #         print(f"\n{t['title']}: {t['summary']}")
+            #         logger.warning(f"Active Tab Threat: {t['summary']}")
+            #         notify_alert(t['title'], t['summary'])
+            #     last_tab_check = time.time()
 
             # 2.5 Injection Defense Sequences
             # Binary Integrity Check (every 5 minutes)
@@ -424,6 +425,20 @@ def monitor_loop():
                     logger.warning(f"Keychain Access: {t['summary']}")
                     notify_alert(t['title'], t['summary'], sound="Ping")
                 last_keychain_check = time.time()
+
+                last_keychain_check = time.time()
+            
+            # Active Defense: File Monitor (TEMPORARILY DISABLED - causes Safari launch)
+            # TODO: Fix lsof Safari trigger issue
+            # active_response_mode = 'aggressive' if os.getenv('SOVEREIGN_AGGRESSIVE_MODE') == '1' else 'safe'
+            # file_threats = core.monitor_sensitive_files(active_response_level=active_response_mode)
+            # for t in file_threats:
+            #     print(f"\n{t['title']}: {t['summary']}")
+            #     logger.critical(f"File Monitor: {t['summary']}")
+            #     sound = "Basso" if t.get('action') == "KILLED" else "Glass"
+            #     notify_alert(t['title'], t['summary'], sound=sound)
+            #     if t.get('action') == "KILLED":
+            #         speak("Active Defense engaged. Unauthorized access terminated.")
 
             # 3. Process & Network Scan
             scanned_pids = set()

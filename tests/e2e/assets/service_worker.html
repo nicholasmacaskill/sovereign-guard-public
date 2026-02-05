@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Persistence Test</title>
+</head>
+
+<body>
+    <h1>Browser Persistence Test</h1>
+    <p>Installing Service Worker...</p>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+                .then(function (registration) {
+                    console.log('Registration successful, scope is:', registration.scope);
+                    document.body.innerHTML += "<p>Service Worker Registered!</p>";
+                })
+                .catch(function (error) {
+                    console.log('Service Worker registration failed:', error);
+                });
+        }
+    </script>
+</body>
+
+</html>

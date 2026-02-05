@@ -14,6 +14,10 @@ from sovereign_engine import (
     SUSPICIOUS_FLAGS, PERSISTENCE_PATHS, VAULT_PATHS, 
     TRUSTED_VAULT_ACCESSORS, DEBUG_PORT_FLAG, DEBUG_PORTS, 
     TRUSTED_BROWSER_PARENTS, THREAT_PATTERNS, STRICT_MODE_THREATS,
+    ENABLE_MEMORY_SCANNING, ENABLE_BINARY_VERIFICATION,
+    ENABLE_LAUNCH_SERVICES_MONITOR, ENABLE_KEYCHAIN_MONITORING,
+    MEMORY_SCAN_INTERVAL, INTEGRITY_CHECK_INTERVAL,
+    LAUNCH_SERVICES_CHECK_INTERVAL, KEYCHAIN_MONITOR_INTERVAL,
     
     # Core Functions
     load_dynamic_whitelist, check_process, check_network_activity,
@@ -30,7 +34,14 @@ from sovereign_engine import (
     scan_browser_history, check_active_tabs,
     
     # Identity Functions
-    verify_totp, verify_identity, verify_hardware_key, generate_backup_codes
+    verify_totp, verify_identity, verify_hardware_key, generate_backup_codes,
+    
+    # Injection Defense
+    verify_binary_integrity, scan_process_memory, verify_process_modules,
+    check_launch_services, monitor_keychain_access,
+    
+    # Active Defense
+    monitor_sensitive_files
 )
 
 # Re-expose for explicit compatibility if needed
@@ -47,6 +58,7 @@ __all__ = [
     'check_triggers_loop', 'start_trigger_thread', 'check_triggers',
     'scan_supply_chain', 'scan_extensions', 'check_multimedia_access', 'check_screen_sharing',
     'scan_browser_history', 'check_active_tabs',
-    'verify_totp', 'verify_identity', 'verify_hardware_key', 'generate_backup_codes'
+    'verify_totp', 'verify_identity', 'verify_hardware_key', 'generate_backup_codes',
+    'monitor_sensitive_files'
 ]
 

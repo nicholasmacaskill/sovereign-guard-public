@@ -107,8 +107,16 @@ def scan_process_memory(proc):
         pid = proc.pid
         name = proc.name()
         
-        # Only scan browser processes
+        # Only scan browser processes (exclude Safari helpers - they have legit exec regions)
         if not any(b in name.lower() for b in ['chrome', 'brave', 'edge', 'arc', 'chromium']):
+            return None
+        
+        # Whitelist for processes that legitimately have unusual memory patterns
+        safe_processes = [
+            'Safari', 'SearchHelper', 'SafariBookmarksSyncAgent',
+            'SafariNotificationAgent', 'SafariLaunchAgent', 'com.apple.Safari'
+        ]
+        if any(safe in name for safe in safe_processes):
             return None
         
         # Use vmmap to get memory regions (macOS)
