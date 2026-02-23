@@ -131,14 +131,30 @@ def scan_launchagent_plists():
                 )
                 if result.returncode == 0 and '--remote-debugging-port' in result.stdout:
                     suspicious.append(fpath)
-                    msg = f"🚨 DEBUG PORT IN LAUNCH AGENT: {fpath}"
+                    
+                    # QUARANTINE LOGIC (Active Defense)
+                    quarantine_dir = path_utils.get_config_dir("quarantine")
+                    os.makedirs(quarantine_dir, exist_ok=True)
+                    q_path = os.path.join(quarantine_dir, f"{os.path.basename(fpath)}.quarantine")
+                    
+                    msg = f"🚨 MALICIOUS PERSISTENCE NEUTRALIZED: {fpath}"
                     print(f"\n{msg}")
-                    logger.warning(msg)
+                    logger.critical(msg)
+                    
+                    # Unload and move the file
+                    try:
+                        subprocess.run(['launchctl', 'unload', fpath], capture_output=True, check=False)
+                        os.rename(fpath, q_path)
+                        logger.info(f"Quarantined malicious plist to: {q_path}")
+                    except Exception as e:
+                        logger.error(f"Failed to quarantine {fpath}: {e}")
+
                     notify_alert(
-                        "⚠️ Malicious LaunchAgent Detected",
-                        f"Plist launches Chrome with --remote-debugging-port:\n{fpath}",
+                        "🔒 Threat Neutralized",
+                        f"A malicious LaunchAgent was found and quarantined:\n{os.path.basename(fpath)}",
                         sound="Basso"
                     )
+                    speak("Active Defense engaged. Malicious persistence detected and neutralized.")
             except Exception:
                 continue
     return suspicious
@@ -432,12 +448,18 @@ def scan_single_process(proc, is_safe_mode, current_mode, seen_pids, scanned_pid
                 print(msg)
                 logger.critical(msg)
                 notify_alert(memory_threat['title'], memory_threat['summary'], sound="Basso")
-                speak("Critical alert. Process injection detected in browser.")
+                speak("Security alert. Possible memory injection detected in browser.")
                 if not is_safe_mode:
-                    try:
-                        proc.kill()
-                        print(f"    [!] NEUTRALIZED: '{name}' terminated due to injection.")
-                    except: pass
+                    # Browsers are prone to JIT false positives; we log and alert but don't kill 
+                    # unless it's a known non-browser or in aggressive mode.
+                    if any(b in name.lower() for b in ['chrome', 'brave', 'edge', 'arc', 'safari']):
+                        print(f"    [!] LOGGED: Suspected injection in '{name}' (PID: {pid}). Termination skipped to prevent work loss.")
+                        logger.warning(f"Injection termination skipped for browser: {name}")
+                    else:
+                        try:
+                            proc.kill()
+                            print(f"    [!] NEUTRALIZED: '{name}' (PID: {pid}) terminated due to injection.")
+                        except: pass
         
         # Module/Library Verification
         if run_memory_scan and core.ENABLE_MEMORY_SCANNING:
