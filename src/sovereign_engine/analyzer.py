@@ -113,6 +113,11 @@ def check_process(proc, mode=None, safe_mode=False):
                         critical_detected.append(f"{patterns.DEBUG_PORT_FLAG} (PRIMARY BROWSER EXPOSURE)")
                     continue 
                 
+                # 4. Permanent Whitelist: Allow Playwright to work out-of-the-box 
+                # if launched from safe paths and NOT using the sensitive port 9222.
+                if is_launched_from_safedev and not is_malicious_test_port:
+                    continue
+                
                 critical_detected.append(f"{patterns.DEBUG_PORT_FLAG} (EXPOSED INTERFACE)")
 
         
