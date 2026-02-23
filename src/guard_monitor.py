@@ -3,6 +3,7 @@ import re
 import time
 import sys
 import os
+import socket
 import logging
 import subprocess
 import platform
@@ -134,6 +135,100 @@ def scan_launchagent_plists():
             except Exception:
                 continue
     return suspicious
+
+
+def check_debug_port_activity():
+    """Detects any process listening or connected on port 9222 (Chrome DevTools).
+    The pf rule blocks inbound connections, but the port may still be OPEN on the
+    process side — we log who opened it so there's a forensic trail.
+    """
+    try:
+        result = subprocess.run(
+            ['lsof', '-iTCP:9222', '-sTCP:LISTEN,ESTABLISHED', '-n', '-P'],
+            capture_output=True, text=True, timeout=3
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return
+
+        for line in result.stdout.strip().splitlines():
+            if 'COMMAND' in line:
+                continue  # header row
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            proc_name = parts[0]
+            pid = parts[1]
+            state = parts[-1] if parts else 'UNKNOWN'
+            msg = (
+                f"🔍 PORT 9222 ACTIVITY: '{proc_name}' (PID: {pid}) has the "
+                f"Chrome DevTools port {state} — connection blocked by pf"
+            )
+            print(f"\n{msg}")
+            logger.warning(msg)
+            notify_alert(
+                "⚠️ Debug Port Activity Logged",
+                f"'{proc_name}' (PID: {pid}) opened port 9222. Connection sealed by firewall.",
+                sound="Basso"
+            )
+    except Exception as e:
+        logger.debug(f"Port 9222 activity monitor error: {e}")
+
+
+def check_linkedin_session_activity():
+    """Flags non-browser processes making established HTTPS connections to LinkedIn.
+    Uses lsof to find active TCP:443 connections then reverse-resolves the remote IP.
+    If a non-browser process is calling linkedin.com, that's session exfiltration risk.
+    """
+    try:
+        result = subprocess.run(
+            ['lsof', '-iTCP:443', '-sTCP:ESTABLISHED', '-n', '-P'],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return
+
+        for line in result.stdout.strip().splitlines():
+            if 'COMMAND' in line:
+                continue
+            parts = line.split()
+            # lsof output: COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME
+            # NAME for TCP: local->remote
+            if len(parts) < 9:
+                continue
+            proc_name = parts[0]
+            pid = parts[1]
+            name_field = parts[8]
+
+            # Skip whitelisted browser processes
+            if any(b in proc_name.lower() for b in core.SESSION_MONITOR_BROWSERS):
+                continue
+
+            # Extract remote IP from the local->remote field
+            if '->' not in name_field:
+                continue
+            remote = name_field.split('->')[1]
+            remote_ip = remote.rsplit(':', 1)[0]  # Handle IPv6 brackets
+
+            # Reverse-resolve to catch LinkedIn IPs
+            try:
+                hostname = socket.gethostbyaddr(remote_ip)[0]
+            except (socket.herror, socket.gaierror):
+                continue
+
+            if any(d in hostname for d in core.PROTECTED_SESSION_DOMAINS):
+                msg = (
+                    f"🚨 LINKEDIN SESSION RISK: Non-browser process '{proc_name}' "
+                    f"(PID: {pid}) has an active HTTPS connection to {hostname} ({remote_ip})"
+                )
+                print(f"\n{msg}")
+                logger.warning(msg)
+                notify_alert(
+                    "🔐 LinkedIn Session Access by Non-Browser",
+                    f"'{proc_name}' (PID: {pid}) → {hostname}\nThis process should not have access to your session.",
+                    sound="Basso"
+                )
+    except Exception as e:
+        logger.debug(f"LinkedIn session monitor error: {e}")
 
 
 def check_safe_mode():
@@ -433,7 +528,9 @@ def monitor_loop():
     last_persistence_check = time.time()
     last_mitm_check = time.time()
     last_tab_check = time.time()
-    last_plist_scan = time.time()    # NEW: LaunchAgent plist scan timer
+    last_plist_scan = time.time()         # LaunchAgent plist scan timer
+    last_debug_port_check = time.time()   # Port 9222 activity monitor
+    last_linkedin_check = time.time()     # LinkedIn session monitor
 
     # Initialize Injection Defense Timers
     last_memory_scan = time.time()
@@ -472,6 +569,16 @@ def monitor_loop():
             if time.time() - last_plist_scan > 300:
                 scan_launchagent_plists()
                 last_plist_scan = time.time()
+
+            # Port 9222 Activity Monitor (every 10 seconds)
+            if time.time() - last_debug_port_check > 10:
+                check_debug_port_activity()
+                last_debug_port_check = time.time()
+
+            # LinkedIn Session Monitor (every 30 seconds)
+            if time.time() - last_linkedin_check > 30:
+                check_linkedin_session_activity()
+                last_linkedin_check = time.time()
 
             # DISABLED: Active Tab Monitoring (Uses AppleScript which auto-launches Safari)
             # if time.time() - last_tab_check > 10:

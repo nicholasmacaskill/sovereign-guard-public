@@ -212,3 +212,20 @@ ENABLE_BINARY_VERIFICATION = os.getenv('ENABLE_BINARY_VERIFICATION', 'true').low
 ENABLE_LAUNCH_SERVICES_MONITOR = os.getenv('ENABLE_LAUNCH_SERVICES_MONITOR', 'true').lower() == 'true'
 ENABLE_KEYCHAIN_MONITORING = os.getenv('ENABLE_KEYCHAIN_MONITORING', 'true').lower() == 'true'
 
+# ============================================================================
+# SESSION PROTECTION
+# ============================================================================
+
+# Domains whose outbound sessions should only be touched by browsers.
+# A non-browser process connecting to any of these triggers an alert.
+PROTECTED_SESSION_DOMAINS = [
+    'linkedin.com',
+    'licdn.com',           # LinkedIn CDN (also carries auth tokens)
+    'platform.linkedin.com',
+]
+
+# Process name substrings considered legitimate session-cookie holders.
+SESSION_MONITOR_BROWSERS = [
+    'chrome', 'brave', 'edge', 'arc', 'safari', 'firefox', 'opera', 'vivaldi',
+]
+
