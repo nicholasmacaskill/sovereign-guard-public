@@ -108,7 +108,11 @@ def scan_process_memory(proc):
         name = proc.name()
         
         # Only scan browser processes (exclude Safari helpers - they have legit exec regions)
-        if not any(b in name.lower() for b in ['chrome', 'brave', 'edge', 'arc', 'chromium']):
+        # Browser process prefixes (avoid substring matches like 'edge' in 'spotlightknowledged')
+        browser_prefixes = ['google chrome', 'brave browser', 'microsoft edge', 'arc', 'chromium', 'safari']
+        is_browser = any(name.lower().startswith(p) for p in browser_prefixes) or name.lower() in ['chrome', 'brave', 'edge']
+        
+        if not is_browser:
             return None
         
         # Whitelist for processes that legitimately have unusual memory patterns
@@ -147,7 +151,9 @@ def scan_process_memory(proc):
                         suspicious_regions.append(line.strip())
                     
                     # Check for execute permissions on heap/stack (classic injection)
-                    if ('MALLOC' in line or 'Stack' in line or 'heap' in line.lower()) and ('r-x' in line or 'rwx' in line):
+                    # Note: We exclude common JIT regions in modern browsers to reduce false positives
+                    is_jit = 'MALLOC' in line or 'JS JIT' in line or 'wasm' in line.lower()
+                    if ('Stack' in line or (('heap' in line.lower() or 'MALLOC' in line) and not is_jit)) and ('r-x' in line or 'rwx' in line):
                         suspicious_regions.append(line.strip())
             
             if suspicious_regions:
@@ -186,7 +192,11 @@ def verify_process_modules(proc):
         name = proc.name()
         
         # Only check browser processes
-        if not any(b in name.lower() for b in ['chrome', 'brave', 'edge', 'arc', 'chromium']):
+        # Browser process prefixes
+        browser_prefixes = ['google chrome', 'brave browser', 'microsoft edge', 'arc', 'chromium', 'safari']
+        is_browser = any(name.lower().startswith(p) for p in browser_prefixes) or name.lower() in ['chrome', 'brave', 'edge']
+        
+        if not is_browser:
             return None
         
         # Get loaded libraries
@@ -362,9 +372,8 @@ def monitor_keychain_access():
                     )
 
                     # Tightened whitelist: browsers may only read their OWN cookie file
-                    # A non-browser process reading any cookie file is always suspicious.
-                    # A browser reading another browser's cookies is also suspicious.
-                    is_browser = any(b in name.lower() for b in ['chrome', 'brave', 'edge', 'safari', 'arc'])
+                    browser_prefixes = ['google chrome', 'brave browser', 'microsoft edge', 'arc', 'chromium', 'safari']
+                    is_browser = any(name.lower().startswith(p) for p in browser_prefixes) or name.lower() in ['chrome', 'brave', 'edge']
                     if accessed_cookie_file and is_browser:
                         # Cross-browser cookie access check
                         browser_cookie_owners = {

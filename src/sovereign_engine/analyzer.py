@@ -209,7 +209,9 @@ def check_network_activity(proc, mode=None):
                     }
                 
                 # Check for suspicious browser telemetry or exfiltration
-                is_browser = any(b in name.lower() for b in ['chrome', 'brave', 'edge', 'arc', 'opera', 'vivaldi', 'chromium'])
+                # Browser process prefixes
+                browser_prefixes = ['google chrome', 'brave browser', 'microsoft edge', 'arc', 'opera', 'vivaldi', 'chromium', 'safari']
+                is_browser = any(name.lower().startswith(p) for p in browser_prefixes) or name.lower() in ['chrome', 'brave', 'edge']
                 if is_browser and mode != 'learn':
                     # This is where we would do domain reputation checks
                     pass
