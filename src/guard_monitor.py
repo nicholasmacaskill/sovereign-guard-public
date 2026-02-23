@@ -28,6 +28,12 @@ try:
 except ImportError:
     _SESSION_LEARNER_AVAILABLE = False
 
+try:
+    from sovereign_engine import tripwire
+    _TRIPWIRE_AVAILABLE = True
+except ImportError:
+    _TRIPWIRE_AVAILABLE = False
+
 # Global State & Constants
 LAST_SPOKEN_TIME = 0
 VOICE_COOLDOWN = 5 
@@ -542,6 +548,9 @@ def monitor_loop():
     # ── Startup Hardening ──────────────────────────────────────────────────────
     enforce_debug_port_firewall()   # Seal port 9222 via pf immediately
     scan_launchagent_plists()       # Check for malicious LaunchAgents at boot
+    
+    if _TRIPWIRE_AVAILABLE:
+        tripwire.deploy_bait()      # Deploy decoy files
     # ──────────────────────────────────────────────────────────────────────────
 
     core.start_trigger_thread()
@@ -652,6 +661,7 @@ def monitor_loop():
                 last_launch_services_check = time.time()
             
             # Keychain Access Monitor (every 30 seconds)
+            # Keychain Access Monitor (every 30 seconds)
             if core.ENABLE_KEYCHAIN_MONITORING and time.time() - last_keychain_check > core.KEYCHAIN_MONITOR_INTERVAL:
                 keychain_threats = core.monitor_keychain_access()
                 for t in keychain_threats:
@@ -660,7 +670,20 @@ def monitor_loop():
                     notify_alert(t['title'], t['summary'], sound="Ping")
                 last_keychain_check = time.time()
 
-                last_keychain_check = time.time()
+            # Honey-Cookie Tripwire (every 5 seconds)
+            if _TRIPWIRE_AVAILABLE:
+                traps = tripwire.check_traps()
+                for t in traps:
+                    msg = f"\n{t['title']}: {t['summary']}"
+                    print(msg)
+                    logger.critical(msg)
+                    notify_alert(t['title'], t['summary'], sound="Basso")
+                    # Immediate Neutralization
+                    try:
+                        p = psutil.Process(t['pid'])
+                        p.kill()
+                        print(f"    [!] NEUTRALIZED: '{t['process']}' (PID: {t['pid']}) killed for touching bait.")
+                    except: pass
             
             # Active Defense: File Monitor (TEMPORARILY DISABLED - causes Safari launch)
             # TODO: Fix lsof Safari trigger issue
