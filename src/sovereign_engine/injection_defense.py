@@ -312,11 +312,16 @@ def monitor_keychain_access():
     threats = []
     
     try:
-        # Use 'lsof' to find processes with keychain files open
+        # Watch keychain files AND browser cookie stores
         keychain_paths = [
             'login.keychain',
             'Login.keychain-db',
-            'Cookies.binarycookies'
+            'Cookies.binarycookies',
+            # Browser cookie SQLite stores (direct read = credential theft risk)
+            'Google/Chrome/Default/Cookies',
+            'Google/Chrome/Default/Cookies-journal',
+            'BraveSoftware/Brave-Browser/Default/Cookies',
+            'BraveSoftware/Brave-Browser/Default/Cookies-journal',
         ]
         
         current_time = datetime.now()
@@ -339,21 +344,55 @@ def monitor_keychain_access():
                     # Log this access
                     if pid not in _keychain_access_log:
                         _keychain_access_log[pid] = []
-                    
+
                     _keychain_access_log[pid].append((current_time, name))
-                    
+
                     # Analyze patterns - check last minute
                     minute_ago = current_time - timedelta(minutes=1)
                     recent_accesses = [
                         access for access in _keychain_access_log[pid]
                         if access[0] > minute_ago
                     ]
-                    
-                    # Check threshold
+
+                    # Determine which file was accessed
+                    accessed_cookie_file = next(
+                        (f.path for f in open_files if any(kc in f.path for kc in keychain_paths)
+                         and 'Cookies' in f.path),
+                        None
+                    )
+
+                    # Tightened whitelist: browsers may only read their OWN cookie file
+                    # A non-browser process reading any cookie file is always suspicious.
+                    # A browser reading another browser's cookies is also suspicious.
+                    is_browser = any(b in name.lower() for b in ['chrome', 'brave', 'edge', 'safari', 'arc'])
+                    if accessed_cookie_file and is_browser:
+                        # Cross-browser cookie access check
+                        browser_cookie_owners = {
+                            'chrome': 'Google/Chrome',
+                            'brave': 'BraveSoftware',
+                            'edge': 'Microsoft Edge',
+                            'arc': 'Arc',
+                            'safari': 'Safari',
+                        }
+                        owner_path = next(
+                            (v for k, v in browser_cookie_owners.items() if k in name.lower()),
+                            None
+                        )
+                        # If the browser is reading a cookie file it doesn't own, flag it
+                        if owner_path and owner_path not in accessed_cookie_file:
+                            threats.append({
+                                "type": "CROSS_BROWSER_COOKIE_ACCESS",
+                                "severity": "HIGH",
+                                "title": "🔐 CROSS-BROWSER COOKIE THEFT",
+                                "summary": f"Process '{name}' (PID: {pid}) is reading another browser's cookie store: {accessed_cookie_file}",
+                                "pid": pid,
+                                "process": name,
+                                "cookie_file": accessed_cookie_file
+                            })
+
+                    # Check threshold for non-browser processes
                     if len(recent_accesses) > patterns.MAX_KEYCHAIN_READS_PER_MINUTE:
-                        # Whitelist browser processes (they legitimately access keychain)
-                        is_browser = any(b in name.lower() for b in ['chrome', 'brave', 'edge', 'safari', 'arc'])
-                        
+                        # Browsers legitimately access keychain frequently
                         if not is_browser:
                             threats.append({
                                 "type": "EXCESSIVE_KEYCHAIN_ACCESS",

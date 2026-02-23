@@ -62,6 +62,80 @@ def speak(text):
     pass
 
 
+def enforce_debug_port_firewall():
+    """Blocks TCP port 9222 (Chrome DevTools Protocol) via pf at startup.
+    Prevents session theft even if the guard is slow to kill a flagged process.
+    No-op when Developer Mode is active.
+    """
+    if check_safe_mode():
+        logger.info("Developer Mode active — skipping port 9222 pf block.")
+        return
+    try:
+        # Check if rule already exists to avoid duplicates
+        existing = subprocess.run(['pfctl', '-sr'], capture_output=True, text=True, timeout=3)
+        if existing.returncode == 0 and '9222' in (existing.stdout or ''):
+            logger.info("Port 9222 pf rule already active.")
+            return
+
+        rule = 'block drop quick proto tcp from any to any port 9222\n'
+        proc = subprocess.run(
+            ['pfctl', '-ef', '-'],
+            input=rule, capture_output=True, text=True, timeout=5
+        )
+        if proc.returncode == 0 or 'pf enabled' in (proc.stderr or '').lower():
+            msg = "🔒 PORT 9222 BLOCKED: Chrome DevTools Protocol sealed via pf firewall."
+            print(msg)
+            logger.info(msg)
+        else:
+            logger.warning(f"pf rule for port 9222 may have failed: {proc.stderr.strip()}")
+    except FileNotFoundError:
+        logger.warning("pfctl not found — cannot block port 9222 via pf.")
+    except Exception as e:
+        logger.warning(f"Could not enforce debug port firewall: {e}")
+
+
+def scan_launchagent_plists():
+    """Scans LaunchAgent and LaunchDaemon plists for entries that launch Chrome
+    with --remote-debugging-port. This is how the Feb 2 attacker persisted.
+    Returns a list of suspicious plist paths.
+    """
+    suspicious = []
+    plist_dirs = [
+        os.path.expanduser('~/Library/LaunchAgents'),
+        '/Library/LaunchAgents',
+        '/Library/LaunchDaemons',
+    ]
+    for d in plist_dirs:
+        if not os.path.isdir(d):
+            continue
+        try:
+            entries = os.listdir(d)
+        except PermissionError:
+            continue
+        for fname in entries:
+            if not fname.endswith('.plist'):
+                continue
+            fpath = os.path.join(d, fname)
+            try:
+                result = subprocess.run(
+                    ['plutil', '-convert', 'json', '-o', '-', fpath],
+                    capture_output=True, text=True, timeout=2
+                )
+                if result.returncode == 0 and '--remote-debugging-port' in result.stdout:
+                    suspicious.append(fpath)
+                    msg = f"🚨 DEBUG PORT IN LAUNCH AGENT: {fpath}"
+                    print(f"\n{msg}")
+                    logger.warning(msg)
+                    notify_alert(
+                        "⚠️ Malicious LaunchAgent Detected",
+                        f"Plist launches Chrome with --remote-debugging-port:\n{fpath}",
+                        sound="Basso"
+                    )
+            except Exception:
+                continue
+    return suspicious
+
+
 def check_safe_mode():
     """Checks if Developer Mode is active and VERIFIES the authorization secret."""
     if not os.path.exists(SAFE_MODE_FILE): return False
@@ -340,27 +414,33 @@ def monitor_loop():
     print("Sovereign Guard Monitor Active (Public Shell)...")
     logger.info("Monitor started.")
     speak("Sovereign Guard online. Verification active.")
-    
+
+    # ── Startup Hardening ──────────────────────────────────────────────────────
+    enforce_debug_port_firewall()   # Seal port 9222 via pf immediately
+    scan_launchagent_plists()       # Check for malicious LaunchAgents at boot
+    # ──────────────────────────────────────────────────────────────────────────
+
     core.start_trigger_thread()
 
     seen_pids = set()
     last_heartbeat = time.time()
     last_hourly_notify = time.time()
     last_clipboard = get_clipboard_content()
-    
+
     # Initialize Hardening Baselines
     persistence_baseline, _ = core.check_persistence(last_files=None)
     browser_persistence_baseline, _ = core.check_browser_persistence()
     last_persistence_check = time.time()
     last_mitm_check = time.time()
     last_tab_check = time.time()
-    
+    last_plist_scan = time.time()    # NEW: LaunchAgent plist scan timer
+
     # Initialize Injection Defense Timers
     last_memory_scan = time.time()
     last_integrity_check = time.time()
     last_launch_services_check = time.time()
     last_keychain_check = time.time()
-    
+
     was_safe_mode = False
     
     try:
@@ -387,6 +467,11 @@ def monitor_loop():
             if time.time() - last_mitm_check > 60:
                 run_mitm_sequence()
                 last_mitm_check = time.time()
+
+            # LaunchAgent Plist Scan (every 5 minutes)
+            if time.time() - last_plist_scan > 300:
+                scan_launchagent_plists()
+                last_plist_scan = time.time()
 
             # DISABLED: Active Tab Monitoring (Uses AppleScript which auto-launches Safari)
             # if time.time() - last_tab_check > 10:
