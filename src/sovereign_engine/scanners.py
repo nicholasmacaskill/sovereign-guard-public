@@ -216,3 +216,61 @@ def check_active_tabs():
             continue
             
     return threats
+
+def scan_root_cas():
+    """
+    Scans macOS System and Login keychains for unknown or suspicious root certificates.
+    Rogue root CAs are a primary vector for HTTPS interception (MITM).
+    """
+    threats = []
+    if platform.system() != 'Darwin': return threats
+    
+    keychains = [
+        '/Library/Keychains/System.keychain',
+        os.path.expanduser('~/Library/Keychains/login.keychain-db')
+    ]
+    
+    for kc in keychains:
+        if not os.path.exists(kc): continue
+        try:
+            # We dump all certificates in PEM format and use openssl to parse subject/issuer
+            cmd = f'security find-certificate -a -p "{kc}"'
+            certs_pem = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL)
+            
+            # Split by certificate boundaries
+            cert_list = certs_pem.split('-----BEGIN CERTIFICATE-----')
+            for cert_body in cert_list:
+                if not cert_body.strip(): continue
+                full_cert = '-----BEGIN CERTIFICATE-----' + cert_body
+                
+                # Check subject and issuer using openssl
+                # We use a single subprocess call per cert to be safe
+                proc = subprocess.Popen(['openssl', 'x509', '-noout', '-subject', '-issuer'], 
+                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                out, err = proc.communicate(input=full_cert)
+                
+                if proc.returncode == 0:
+                    subject = ""
+                    issuer = ""
+                    for line in out.splitlines():
+                        if line.startswith('subject='): subject = line.replace('subject=', '').strip()
+                        if line.startswith('issuer='): issuer = line.replace('issuer=', '').strip()
+                    
+                    # A root CA is self-signed (subject == issuer)
+                    if subject and subject == issuer:
+                        # Check if it matches any of our trusted patterns
+                        is_trusted = any(re.search(pattern, subject, re.IGNORECASE) for pattern in patterns.TRUSTED_CA_PATTERNS)
+                        
+                        if not is_trusted:
+                            threats.append({
+                                "type": "SUSPICIOUS_ROOT_CA",
+                                "severity": "CRITICAL",
+                                "title": "🔓 ROGUE ROOT CA DETECTED",
+                                "summary": f"An unknown self-signed root certificate was found in {os.path.basename(kc)}: {subject}",
+                                "subject": subject,
+                                "keychain": kc
+                            })
+        except:
+            continue
+            
+    return threats

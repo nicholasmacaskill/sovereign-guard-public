@@ -538,6 +538,7 @@ def monitor_loop():
     last_plist_scan = time.time()         # LaunchAgent plist scan timer
     last_debug_port_check = time.time()   # Port 9222 activity monitor
     last_linkedin_check = time.time()     # LinkedIn session monitor
+    last_ca_scan = time.time()           # Root CA monitor timer
 
     # Initialize Injection Defense Timers
     last_memory_scan = time.time()
@@ -588,6 +589,16 @@ def monitor_loop():
                 if _SESSION_LEARNER_AVAILABLE:
                     session_learner.scan_browser_session_domains()
                 last_linkedin_check = time.time()
+
+            # Root CA Monitor (every 15 minutes)
+            if time.time() - last_ca_scan > 900:
+                ca_threats = core.scan_root_cas()
+                for t in ca_threats:
+                    print(f"\n{t['title']}: {t['summary']}")
+                    logger.critical(f"Root CA: {t['summary']}")
+                    notify_alert(t['title'], t['summary'], sound="Basso")
+                    speak("Security Alert. A rogue root certificate was detected in your system keychain. Potential Man in the Middle hijacking.")
+                last_ca_scan = time.time()
 
             # DISABLED: Active Tab Monitoring (Uses AppleScript which auto-launches Safari)
             # if time.time() - last_tab_check > 10:

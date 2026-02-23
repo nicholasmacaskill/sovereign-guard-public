@@ -231,3 +231,13 @@ SESSION_MONITOR_BROWSERS = [
     'chrome', 'brave', 'edge', 'arc', 'safari', 'firefox', 'opera', 'vivaldi',
 ]
 
+# Trusted Root Certificate Authority patterns to avoid false positives.
+# A rogue CA will likely not match these patterns.
+TRUSTED_CA_PATTERNS = [
+    r'apple\.com', r'Apple Worldwide Developer Relations', r'System Identity',
+    r'DigiCert', r'GlobalSign', r'Sectigo', r'Entrust', r'GoDaddy',
+    r'Let\'s Encrypt', r'Amazon', r'Google Trust Services', r'Microsoft',
+    r'UserTrust', r'Adobe', r'Verizon', r'Cloudflare', r'Certum',
+    r'QuoVadis', r'SwissSign', r'Trustwave', r'Buypass', r'E-Guven'
+]
+
