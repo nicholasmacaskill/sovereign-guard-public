@@ -130,6 +130,8 @@ def dev_mode():
     if not os.path.exists(SAFE_MODE_FILE):
         with open(SAFE_MODE_FILE, 'w') as f: f.write(secret or "")
         print("⚠️  [DEVELOPER MODE ENABLED]")
+        print("[-] Playwright/Puppeteer whitelisted for non-primary browser profiles.")
+        print("[-] To unseal Port 9222 for debugging, run: sudo pfctl -a com.sovereign.guard -F rules")
     else:
         print("[-] Already in Developer Mode.")
 
@@ -137,6 +139,12 @@ def secure_mode():
     if os.path.exists(SAFE_MODE_FILE):
         os.remove(SAFE_MODE_FILE)
         print("🛡️  [SECURE MODE ENABLED]")
+        print("[+] Re-sealing Port 9222...")
+        try:
+            subprocess.run(['sudo', 'pfctl', '-a', 'com.sovereign.guard', '-f', '/etc/pf.anchors/com.sovereign.guard'], check=False)
+            print("🔒 Port 9222 is sealed.")
+        except:
+            print("⚠️  Failed to re-seal Port 9222 automatically. Run: sudo ./fix_firewall.sh")
     else:
         print("[-] Already in Secure Mode.")
 

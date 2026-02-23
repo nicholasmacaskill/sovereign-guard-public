@@ -90,14 +90,29 @@ def check_process(proc, mode=None, safe_mode=False):
                     suspicious_detected.append(flag)
             
             if arg.startswith(patterns.DEBUG_PORT_FLAG):
-                # TEST MODE: Allow random ports used by Playwright, but catch 9222
-                if os.environ.get('SOVEREIGN_TEST_MODE') == '1':
-                    is_malicious_test_port = "9222" in arg or "9222" in ' '.join(cmdline)
-                    if not is_malicious_test_port:
-                        continue # Skip flagging logic for Playwright
+                # 1. Check for Developer Mode bypass
+                is_dev_mode = os.path.exists(path_utils.get_config_file("developer_mode.lock"))
                 
-                # Un-nested: Always flag debug port as critical (or suspicious)
-                # Used to be: if lineage_suspicious: ...
+                # 2. Identify "Safe" dev/test paths (e.g. Playwright, local project folders)
+                safe_dev_paths = [
+                    os.path.expanduser('~/Library/Caches/ms-playwright'),
+                    os.path.expanduser('~/Desktop/python-sovereign-guard'), # local projects
+                    '/tmp/playwright',
+                ]
+                is_launched_from_safedev = any(exe_path.startswith(p) for p in safe_dev_paths)
+                
+                # 3. Decision Logic:
+                # - Allow random ports used by Playwright in Dev Mode or Test Mode
+                # - STRICT: If it's the PRIMARY browser binary (/Applications/...) ALWAYS flag port 9222.
+                is_primary_browser = any(exe_path == b for b in patterns.BROWSER_BINARY_HASHES.keys())
+                is_malicious_test_port = "9222" in arg or "9222" in ' '.join(cmdline)
+                
+                if (is_dev_mode and is_launched_from_safedev) or os.environ.get('SOVEREIGN_TEST_MODE') == '1':
+                    if is_primary_browser and is_malicious_test_port:
+                        # Even in dev mode, we don't let primary browser expose port 9222
+                        critical_detected.append(f"{patterns.DEBUG_PORT_FLAG} (PRIMARY BROWSER EXPOSURE)")
+                    continue 
+                
                 critical_detected.append(f"{patterns.DEBUG_PORT_FLAG} (EXPOSED INTERFACE)")
 
         
