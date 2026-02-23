@@ -459,8 +459,18 @@ def scan_single_process(proc, is_safe_mode, current_mode, seen_pids, scanned_pid
                     # Browsers are prone to JIT false positives; we log and alert but don't kill 
                     # unless it's a known non-browser or in aggressive mode.
                     if any(b in name.lower() for b in ['chrome', 'brave', 'edge', 'arc', 'safari']):
-                        print(f"    [!] LOGGED: Suspected injection in '{name}' (PID: {pid}). Termination skipped to prevent work loss.")
-                        logger.warning(f"Injection termination skipped for browser: {name}")
+                        # Check if this browser is ALSO exposing the hacker's port (definitive threat)
+                        cmdline = ' '.join(proc.cmdline())
+                        is_exposing_port = patterns.DEBUG_PORT_FLAG in cmdline and "9222" in cmdline
+                        
+                        if is_exposing_port:
+                            try:
+                                proc.kill()
+                                print(f"    [!] NEUTRALIZED: '{name}' (PID: {pid}) killed - Memory Injection + Debug Port 9222 detected.")
+                            except: pass
+                        else:
+                            print(f"    [!] LOGGED: Suspected injection in '{name}' (PID: {pid}). Termination skipped to prevent work loss.")
+                            logger.warning(f"Injection termination skipped for browser: {name}")
                     else:
                         try:
                             proc.kill()
@@ -604,8 +614,8 @@ def monitor_loop():
                 run_mitm_sequence()
                 last_mitm_check = time.time()
 
-            # LaunchAgent Plist Scan (every 5 minutes)
-            if time.time() - last_plist_scan > 300:
+            # LaunchAgent Plist Scan (every 2 minutes)
+            if time.time() - last_plist_scan > 120:
                 scan_launchagent_plists()
                 last_plist_scan = time.time()
 
@@ -646,12 +656,25 @@ def monitor_loop():
                 integrity_threats = core.verify_binary_integrity()
                 for t in integrity_threats:
                     print(f"\n{t['title']}: {t['summary']}")
-                    logger.critical(f"Binary Integrity: {t['summary']}")
+            # Binary Integrity Verification (periodic)
+            if core.ENABLE_BINARY_VERIFICATION and (time.time() - last_integrity_check > core.INTEGRITY_CHECK_INTERVAL):
+                binary_threats = core.verify_binary_integrity()
+                for t in binary_threats:
+                    msg = f"\n{t['title']}: {t['summary']}"
+                    print(msg)
+                    logger.critical(msg)
                     notify_alert(t['title'], t['summary'], sound="Basso")
-                    speak("Critical security alert. Browser binary has been tampered with.")
+                    # Binary violation = Fatal. We kill any process matching this binary.
+                    if not is_safe_mode:
+                        for p in psutil.process_iter(['exe']):
+                            try:
+                                if p.info['exe'] == t['path']:
+                                    p.kill()
+                                    print(f"    [!] NEUTRALIZED: Tampered binary '{os.path.basename(t['path'])}' terminated.")
+                            except: pass
                 last_integrity_check = time.time()
-            
-            # Launch Services Monitor (every 2 minutes)
+                
+            # Launch Services Hijack Monitor (every 2 minutes)
             if core.ENABLE_LAUNCH_SERVICES_MONITOR and time.time() - last_launch_services_check > core.LAUNCH_SERVICES_CHECK_INTERVAL:
                 ls_threats = core.check_launch_services()
                 for t in ls_threats:

@@ -113,7 +113,11 @@ def scan_process_memory(proc):
         is_browser = any(name.lower().startswith(p) for p in browser_prefixes) or name.lower() in ['chrome', 'brave', 'edge']
         
         if not is_browser:
+            if any(b in name.lower() for b in ['chrome', 'brave', 'edge', 'arc']):
+                 logging.debug(f"DEBUG_SCAN: Process '{name}' (PID: {pid}) blocked by tight prefix filter (would have matched old substring filter)")
             return None
+        
+        logging.info(f"DEBUG_SCAN: Scanning process '{name}' (PID: {pid}) - passed prefix filter")
         
         # Whitelist for processes that legitimately have unusual memory patterns
         safe_processes = [
@@ -139,30 +143,37 @@ def scan_process_memory(proc):
             suspicious_regions = []
             
             for line in result.stdout.splitlines():
-                # Look for EXECUTE permissions on unusual regions
                 # Format: TYPE START-END [ SIZE] PERMISSIONS PATH
-                if 'r-x' in line or 'rwx' in line:
-                    # Check if this is a suspicious region
-                    # Legitimate code should be in known paths
-                    is_trusted = any(trusted in line for trusted in patterns.TRUSTED_LIBRARY_PATHS)
+                if 'r-x' not in line and 'rwx' not in line:
+                    continue
                     
-                    # RWX (read-write-execute) is highly suspicious for code
-                    if 'rwx' in line and not is_trusted:
-                        suspicious_regions.append(line.strip())
+                # 1. Is this already trusted? (Signed system library/framework)
+                is_trusted = any(trusted in line for trusted in patterns.TRUSTED_LIBRARY_PATHS)
+                if is_trusted:
+                    continue
                     
-                    # Check for execute permissions on heap/stack (classic injection)
-                    # Note: We exclude common JIT regions in modern browsers to reduce false positives
-                    is_jit = 'MALLOC' in line or 'JS JIT' in line or 'wasm' in line.lower()
-                    if ('Stack' in line or (('heap' in line.lower() or 'MALLOC' in line) and not is_jit)) and ('r-x' in line or 'rwx' in line):
-                        suspicious_regions.append(line.strip())
+                # 2. Heuristic: Root out legitimate browser JIT/Wasm/V8 regions
+                # Browsers create anonymous RWX regions for dynamic code.
+                is_jit = any(token in line for token in ['JS JIT', 'wasm', 'V8', 'MALLOC', 'heap', 'Stack', 'Mapped file'])
+                
+                # 3. Decision Logic:
+                # - RWX is suspicious, but common in Browsers for JIT.
+                # - Execution in Heap/Stack is the classic injection signature.
+                if 'rwx' in line and not is_jit:
+                    # An RWX region that isn't heap/JIT/mapped is highly weird.
+                    suspicious_regions.append(line.strip())
+                elif ('Stack' in line or 'heap' in line.lower()) and ('r-p' not in line):
+                    # Executable stack/heap (not marked as private/protected)
+                    if not is_jit:
+                         suspicious_regions.append(line.strip())
             
             if suspicious_regions:
                 return {
                     "type": "MEMORY_INJECTION",
                     "severity": "CRITICAL",
                     "title": "🚨 PROCESS INJECTION DETECTED",
-                    "summary": f"Process '{name}' (PID: {pid}) has suspicious executable memory regions",
-                    "details": suspicious_regions[:3],  # Limit to first 3
+                    "summary": f"Process '{name}' (PID: {pid}) has {len(suspicious_regions)} suspicious executable memory regions",
+                    "details": suspicious_regions[:3],
                     "pid": pid,
                     "process": name
                 }
