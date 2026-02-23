@@ -222,6 +222,8 @@ PROTECTED_SESSION_DOMAINS = [
     'linkedin.com',
     'licdn.com',           # LinkedIn CDN (also carries auth tokens)
     'platform.linkedin.com',
+    'tradelocker.com',
+    'api.tradelocker.com',
 ]
 
 # Process name substrings considered legitimate session-cookie holders.

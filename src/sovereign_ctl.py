@@ -246,6 +246,16 @@ def dashboard():
     except Exception as e:
         print(f"[!] Failed to launch dashboard: {e}")
 
+def sessions():
+    """Reviews session domains learned from browser activity."""
+    print("🔍 SOVEREIGN GUARD // SESSION DOMAIN REVIEW")
+    print("    Domains your browser has connected to (ranked by frequency)")
+    try:
+        import session_learner
+        session_learner.print_session_review()
+    except ImportError:
+        print("[!] session_learner module not found.")
+
 def report():
     """Generates a security report."""
     print("📋 Generating Security Report...")
@@ -270,6 +280,7 @@ def main():
         'clean': clean_logs,
         'dashboard': dashboard,
         'report': report,
+        'sessions': sessions,
         'uninstall': uninstall_wizard
     }
     

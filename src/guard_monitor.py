@@ -21,6 +21,13 @@ except ImportError:
     print("CRITICAL: 'sovereign_core' module not found.")
     sys.exit(1)
 
+# Session domain learner (passive, no-fail)
+try:
+    import session_learner
+    _SESSION_LEARNER_AVAILABLE = True
+except ImportError:
+    _SESSION_LEARNER_AVAILABLE = False
+
 # Global State & Constants
 LAST_SPOKEN_TIME = 0
 VOICE_COOLDOWN = 5 
@@ -575,9 +582,11 @@ def monitor_loop():
                 check_debug_port_activity()
                 last_debug_port_check = time.time()
 
-            # LinkedIn Session Monitor (every 30 seconds)
+            # LinkedIn Session Monitor + Domain Learner (every 30 seconds)
             if time.time() - last_linkedin_check > 30:
                 check_linkedin_session_activity()
+                if _SESSION_LEARNER_AVAILABLE:
+                    session_learner.scan_browser_session_domains()
                 last_linkedin_check = time.time()
 
             # DISABLED: Active Tab Monitoring (Uses AppleScript which auto-launches Safari)
