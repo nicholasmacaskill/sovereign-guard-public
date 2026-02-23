@@ -224,6 +224,8 @@ PROTECTED_SESSION_DOMAINS = [
     'platform.linkedin.com',
     'tradelocker.com',
     'api.tradelocker.com',
+    'orcid.org',
+    'api.orcid.org',
 ]
 
 # Process name substrings considered legitimate session-cookie holders.
