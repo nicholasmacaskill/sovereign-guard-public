@@ -147,24 +147,21 @@ def scan_process_memory(proc):
                 if 'r-x' not in line and 'rwx' not in line:
                     continue
                     
-                # 1. Is this already trusted? (Signed system library/framework)
+                # 1. Is this already trusted?
                 is_trusted = any(trusted in line for trusted in patterns.TRUSTED_LIBRARY_PATHS)
                 if is_trusted:
                     continue
                     
-                # 2. Heuristic: Root out legitimate browser JIT/Wasm/V8 regions
-                # Browsers create anonymous RWX regions for dynamic code.
-                is_jit = any(token in line for token in ['JS JIT', 'wasm', 'V8', 'MALLOC', 'heap', 'Stack', 'Mapped file'])
+                # 2. Heuristic: Filter legitimate dynamic code regions (JIT/Wasm/etc)
+                # Proprietary logic for high-fidelity JIT detection is redacted
+                is_dynamic_code = any(token in line for token in ['JS JIT', 'wasm', 'V8', 'MALLOC', 'heap', 'Stack', 'Mapped file'])
                 
                 # 3. Decision Logic:
-                # - RWX is suspicious, but common in Browsers for JIT.
-                # - Execution in Heap/Stack is the classic injection signature.
-                if 'rwx' in line and not is_jit:
-                    # An RWX region that isn't heap/JIT/mapped is highly weird.
+                # Detect unusual executable memory regions that don't match standard profiles
+                if 'rwx' in line and not is_dynamic_code:
                     suspicious_regions.append(line.strip())
                 elif ('Stack' in line or 'heap' in line.lower()) and ('r-p' not in line):
-                    # Executable stack/heap (not marked as private/protected)
-                    if not is_jit:
+                    if not is_dynamic_code:
                          suspicious_regions.append(line.strip())
             
             if suspicious_regions:

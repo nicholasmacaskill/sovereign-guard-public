@@ -367,22 +367,28 @@ def calculate_trust_score():
     score = 100
     factors = {}
     
-    # 1. Learning Phase Completion (-30 if incomplete)
+    # Scoring constants (Generalized in public version)
+    WEIGHT_LEVEL_1 = 30
+    WEIGHT_LEVEL_2 = 20
+    WEIGHT_LEVEL_3 = 10
+    MAX_THREAT_PENALTY = 40
+
+    # 1. Learning Phase Completion
     try:
         summary = analyze_learnings()
         days_elapsed = summary.get('days_elapsed', 0)
         
         if days_elapsed < 3:
-            deduction = 30
+            deduction = WEIGHT_LEVEL_1
             factors['learning_phase'] = {'status': 'incomplete', 'deduction': deduction, 'days': days_elapsed}
             score -= deduction
         else:
             factors['learning_phase'] = {'status': 'complete', 'deduction': 0, 'days': days_elapsed}
     except:
-        factors['learning_phase'] = {'status': 'unknown', 'deduction': 30}
-        score -= 30
+        factors['learning_phase'] = {'status': 'unknown', 'deduction': WEIGHT_LEVEL_1}
+        score -= WEIGHT_LEVEL_1
     
-    # 2. Recent Threats (-5 per threat, max -40)
+    # 2. Recent Threats
     try:
         event_log = path_utils.get_config_file('guard_monitor.log')
         threat_count = 0
@@ -393,33 +399,31 @@ def calculate_trust_score():
                     if 'THREAT' in line or 'SUSPICIOUS' in line:
                         threat_count += 1
         
-        deduction = min(threat_count * 5, 40)
+        deduction = min(threat_count * 5, MAX_THREAT_PENALTY)
         factors['recent_threats'] = {'count': threat_count, 'deduction': deduction}
         score -= deduction
     except:
         factors['recent_threats'] = {'count': 0, 'deduction': 0}
     
-    # 3. OS Hardening (-20 if missing)
+    # 3. OS Hardening
     try:
-        # Check for manual override first
         lockdown_override = os.getenv('LOCKDOWN_MODE_ENABLED', '').lower()
         if lockdown_override == 'true':
             factors['os_hardening'] = {'status': 'enabled', 'deduction': 0}
         else:
-            # Import audit_system from tools/
             import sys
             sys.path.append(os.path.join(path_utils.get_project_root(), "tools"))
             import audit_system
             lockdown_enabled = audit_system.check_mac_lockdown_mode()
             if not lockdown_enabled:
-                factors['os_hardening'] = {'status': 'disabled', 'deduction': 20}
-                score -= 20
+                factors['os_hardening'] = {'status': 'disabled', 'deduction': WEIGHT_LEVEL_2}
+                score -= WEIGHT_LEVEL_2
             else:
                 factors['os_hardening'] = {'status': 'enabled', 'deduction': 0}
     except Exception as e:
         factors['os_hardening'] = {'status': 'unknown', 'deduction': 0, 'error': str(e)}
     
-    # 4. 2FA Configuration (-10 if missing)
+    # 4. 2FA Configuration
     try:
         env_file = path_utils.get_config_file('.env.sovereign')
         rubicon_enforced = False
@@ -432,13 +436,13 @@ def calculate_trust_score():
                         break
         
         if not rubicon_enforced:
-            factors['2fa'] = {'status': 'disabled', 'deduction': 10}
-            score -= 10
+            factors['2fa'] = {'status': 'disabled', 'deduction': WEIGHT_LEVEL_3}
+            score -= WEIGHT_LEVEL_3
         else:
             factors['2fa'] = {'status': 'enabled', 'deduction': 0}
     except:
-        factors['2fa'] = {'status': 'unknown', 'deduction': 10}
-        score -= 10
+        factors['2fa'] = {'status': 'unknown', 'deduction': WEIGHT_LEVEL_3}
+        score -= WEIGHT_LEVEL_3
     
     # Determine grade
     if score >= 90:

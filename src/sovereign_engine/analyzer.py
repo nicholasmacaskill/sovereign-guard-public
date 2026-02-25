@@ -57,35 +57,30 @@ def check_process(proc, mode=None, safe_mode=False, reload_whitelist=True):
         #     if not any(exe_path.startswith(safe) for safe in patterns.SAFE_BROWSER_PATHS):
         #         spoof_detected = True
 
-        # Lineage Protection: Detect browsers launched by untrusted parents
+        # Lineage Protection: Detect processes launched by untrusted parents
         lineage_suspicious = False
         try:
             parent = proc.parent()
             parent_name = parent.name() if parent else "Unknown"
-            parent_pid = parent.pid if parent else "N/A"
-            origin_info = f"Launched by: '{parent_name}' (PID: {parent_pid})"
+            origin_info = f"Launched by: '{parent_name}'"
             
             if is_monitored_app:
+                # Proprietary heuristic: Validate the parent relationship
+                # Specific trust-chain logic is redacted in the public version
                 if parent_name == "Unknown":
-                    # High risk: A monitored app with no identifiable parent
                     lineage_suspicious = True
                 else:
                     parent_lower = parent_name.lower()
-                    # 1. Check explicit trusted parents
-                    is_trusted_parent = any(p.lower() in parent_lower for p in patterns.TRUSTED_BROWSER_PARENTS)
-                    
-                    # 2. Check same-family trust (e.g., Chrome parent of Chrome Helper)
-                    is_family_trust = any(b in parent_lower for b in monitored_keywords)
-                    
-                    if not (is_trusted_parent or is_family_trust):
+                    # Placeholder for behavioral trust logic
+                    is_trusted = any(p.lower() in parent_lower for p in patterns.TRUSTED_BROWSER_PARENTS)
+                    if not is_trusted:
                         lineage_suspicious = True
         except (psutil.NoSuchProcess, psutil.AccessDenied):
-            origin_info = "Launched by: [ACCESS DENIED]"
-            lineage_suspicious = is_monitored_app # Access denied on parent is suspicious for monitored apps
-        except Exception as e:
-            logging.debug(f"Lineage check error: {e}")
-            origin_info = "Launched by: Error"
-            lineage_suspicious = False # Fail closed for errors to avoid noise
+            origin_info = "Launched by: [REDACTED]"
+            lineage_suspicious = is_monitored_app 
+        except Exception:
+            origin_info = "Launched by: Internal"
+            lineage_suspicious = False 
         
         critical_detected = []
         suspicious_detected = []
@@ -105,35 +100,14 @@ def check_process(proc, mode=None, safe_mode=False, reload_whitelist=True):
                     suspicious_detected.append(flag)
             
             if arg.startswith(patterns.DEBUG_PORT_FLAG):
-                logging.debug(f"[ANALYZER] Found debug port flag in {name}: {arg}")
-                # 1. Check for Developer Mode bypass
+                # Proprietary Decision Logic:
+                # Redacted: Specific heuristics for filtering legitimate dev activity 
+                # from remote debugging exploits.
                 is_dev_mode = os.path.exists(path_utils.get_config_file("developer_mode.lock"))
                 
-                # 2. Identify "Safe" dev/test paths (e.g. Playwright, local project folders)
-                safe_dev_paths = [
-                    os.path.expanduser('~/Library/Caches/ms-playwright'),
-                    os.path.expanduser('~/Desktop/python-sovereign-guard'), # local projects
-                    '/tmp/playwright',
-                ]
-                is_launched_from_safedev = any(exe_path.startswith(p) for p in safe_dev_paths)
-                
-                # 3. Decision Logic:
-                # - Allow random ports used by Playwright in Dev Mode or Test Mode
-                # - STRICT: If it's the PRIMARY browser binary (/Applications/...) ALWAYS flag port 9222.
-                is_primary_browser = any(exe_path.lower().strip() == b.lower().strip() for b in patterns.BROWSER_BINARY_HASHES.keys())
-                is_malicious_test_port = "9222" in arg or "9222" in ' '.join(cmdline)
-                
-                if (is_dev_mode and is_launched_from_safedev) or os.environ.get('SOVEREIGN_TEST_MODE') == '1':
-                    logging.debug(f"[ANALYZER] Test/Dev mode bypass check for {name}: is_primary={is_primary_browser}, is_malicious={is_malicious_test_port}")
-                    if is_primary_browser and is_malicious_test_port:
-                        # Even in dev mode, we don't let primary browser expose port 9222
-                        critical_detected.append(f"{patterns.DEBUG_PORT_FLAG} (PRIMARY BROWSER EXPOSURE)")
+                # Internal whitelisting logic redacted
+                if is_dev_mode or os.environ.get('SOVEREIGN_TEST_MODE') == '1':
                     continue 
-                
-                # 4. Permanent Whitelist: Allow Playwright to work out-of-the-box 
-                # if launched from safe paths and NOT using the sensitive port 9222.
-                if is_launched_from_safedev and not is_malicious_test_port:
-                    continue
                 
                 critical_detected.append(f"{patterns.DEBUG_PORT_FLAG} (EXPOSED INTERFACE)")
 
