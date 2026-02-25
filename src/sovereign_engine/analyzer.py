@@ -5,13 +5,15 @@ import subprocess
 import socket
 import threading
 from . import patterns
+import path_utils
 
-def check_process(proc, mode=None, safe_mode=False):
+def check_process(proc, mode=None, safe_mode=False, reload_whitelist=True):
     """
     Check if a process is suspicious or malicious
     """
     # Trigger dynamic reload
-    patterns.load_dynamic_whitelist()
+    if reload_whitelist:
+        patterns.load_dynamic_whitelist()
 
     if safe_mode:
         mode = 'warn'
@@ -29,6 +31,7 @@ def check_process(proc, mode=None, safe_mode=False):
             pid = proc.pid
             name = proc.name()
             exe_path = proc.exe() or ""
+            logging.debug(f"[ANALYZER] Checking process: {name} (PID: {pid}) - Path: {exe_path}")
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, OSError):
             return None
         
@@ -54,23 +57,35 @@ def check_process(proc, mode=None, safe_mode=False):
         #     if not any(exe_path.startswith(safe) for safe in patterns.SAFE_BROWSER_PATHS):
         #         spoof_detected = True
 
-        # DISABLED: Lineage checking was too aggressive
+        # Lineage Protection: Detect browsers launched by untrusted parents
         lineage_suspicious = False
-        # try:
-        #     parent = proc.parent()
-        #     parent_name = parent.name() if parent else "Unknown"
-        #     parent_pid = parent.pid if parent else "N/A"
-        #     origin_info = f"Launched by: '{parent_name}' (PID: {parent_pid})"
-        #     
-        #     if is_monitored_app and parent_name:
-        #         parent_lower = parent_name.lower()
-        #         if not any(p in parent_lower for p in patterns.TRUSTED_BROWSER_PARENTS):
-        #             if not any(b in parent_lower for b in ['chrome', 'brave', 'edge', 'arc', 'opera']):
-        #                 lineage_suspicious = True
-        # except:
-        #     origin_info = "Launched by: Unknown"
-        #     lineage_suspicious = is_monitored_app
-        origin_info = "Launched by: N/A"
+        try:
+            parent = proc.parent()
+            parent_name = parent.name() if parent else "Unknown"
+            parent_pid = parent.pid if parent else "N/A"
+            origin_info = f"Launched by: '{parent_name}' (PID: {parent_pid})"
+            
+            if is_monitored_app:
+                if parent_name == "Unknown":
+                    # High risk: A monitored app with no identifiable parent
+                    lineage_suspicious = True
+                else:
+                    parent_lower = parent_name.lower()
+                    # 1. Check explicit trusted parents
+                    is_trusted_parent = any(p.lower() in parent_lower for p in patterns.TRUSTED_BROWSER_PARENTS)
+                    
+                    # 2. Check same-family trust (e.g., Chrome parent of Chrome Helper)
+                    is_family_trust = any(b in parent_lower for b in monitored_keywords)
+                    
+                    if not (is_trusted_parent or is_family_trust):
+                        lineage_suspicious = True
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            origin_info = "Launched by: [ACCESS DENIED]"
+            lineage_suspicious = is_monitored_app # Access denied on parent is suspicious for monitored apps
+        except Exception as e:
+            logging.debug(f"Lineage check error: {e}")
+            origin_info = "Launched by: Error"
+            lineage_suspicious = False # Fail closed for errors to avoid noise
         
         critical_detected = []
         suspicious_detected = []
@@ -90,6 +105,7 @@ def check_process(proc, mode=None, safe_mode=False):
                     suspicious_detected.append(flag)
             
             if arg.startswith(patterns.DEBUG_PORT_FLAG):
+                logging.debug(f"[ANALYZER] Found debug port flag in {name}: {arg}")
                 # 1. Check for Developer Mode bypass
                 is_dev_mode = os.path.exists(path_utils.get_config_file("developer_mode.lock"))
                 
@@ -104,10 +120,11 @@ def check_process(proc, mode=None, safe_mode=False):
                 # 3. Decision Logic:
                 # - Allow random ports used by Playwright in Dev Mode or Test Mode
                 # - STRICT: If it's the PRIMARY browser binary (/Applications/...) ALWAYS flag port 9222.
-                is_primary_browser = any(exe_path == b for b in patterns.BROWSER_BINARY_HASHES.keys())
+                is_primary_browser = any(exe_path.lower().strip() == b.lower().strip() for b in patterns.BROWSER_BINARY_HASHES.keys())
                 is_malicious_test_port = "9222" in arg or "9222" in ' '.join(cmdline)
                 
                 if (is_dev_mode and is_launched_from_safedev) or os.environ.get('SOVEREIGN_TEST_MODE') == '1':
+                    logging.debug(f"[ANALYZER] Test/Dev mode bypass check for {name}: is_primary={is_primary_browser}, is_malicious={is_malicious_test_port}")
                     if is_primary_browser and is_malicious_test_port:
                         # Even in dev mode, we don't let primary browser expose port 9222
                         critical_detected.append(f"{patterns.DEBUG_PORT_FLAG} (PRIMARY BROWSER EXPOSURE)")
@@ -191,20 +208,15 @@ def check_mitm_vulnerabilities():
 
     return threats
 
-def check_network_activity(proc, mode=None):
+def check_network_activity(proc, mode):
     """
     Monitors a process for suspicious network connections.
     """
-    if mode is None:
-        try:
-            from learning_engine import get_protection_mode
-            mode = get_protection_mode()
-        except:
-            mode = os.getenv('PROTECTION_MODE', 'protect')
 
     try:
         pid = proc.pid
         name = proc.name()
+        logging.debug(f"[ANALYZER] Checking process: {name} (PID: {pid})")
         connections = proc.connections(kind='inet')
         
         for conn in connections:

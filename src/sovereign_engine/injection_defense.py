@@ -323,7 +323,7 @@ def check_launch_services():
     return threats
 
 
-def monitor_keychain_access():
+def monitor_keychain_access(procs=None):
     """
     Monitors processes accessing the keychain for unusual patterns.
     Detects excessive or unusual credential access.
@@ -338,22 +338,33 @@ def monitor_keychain_access():
             'login.keychain',
             'Login.keychain-db',
             'Cookies.binarycookies',
-            # Browser cookie SQLite stores (direct read = credential theft risk)
             'Google/Chrome/Default/Cookies',
-            'Google/Chrome/Default/Cookies-journal',
             'BraveSoftware/Brave-Browser/Default/Cookies',
-            'BraveSoftware/Brave-Browser/Default/Cookies-journal',
+            'Microsoft Edge/Default/Cookies',
+            'Arc/User Data/Default/Cookies',
         ]
         
         current_time = datetime.now()
         
-        for proc in psutil.process_iter(['pid', 'name']):
+        # Use provided procs or iterate
+        process_list = procs if procs is not None else psutil.process_iter(['pid', 'name'])
+        
+        for proc in process_list:
             try:
-                pid = proc.info['pid']
-                name = proc.info['name']
+                # Handle both Process objects and procs with 'info'
+                if isinstance(proc, dict): # if someone passed procs=[p.info for p in procs]
+                    pinfo = proc
+                    pid = pinfo['pid']
+                    name = pinfo['name']
+                    # We still need the real Process object to call open_files()
+                    p_obj = psutil.Process(pid)
+                else:
+                    pid = proc.pid
+                    name = proc.name()
+                    p_obj = proc
                 
-                # Check open files
-                open_files = proc.open_files()
+                # Check open files (this is slow, but we only do it every 30s)
+                open_files = p_obj.open_files()
                 keychain_access = False
                 
                 for f in open_files:
@@ -410,19 +421,19 @@ def monitor_keychain_access():
                                 "cookie_file": accessed_cookie_file
                             })
 
-                    # Check threshold for non-browser processes
-                    if len(recent_accesses) > patterns.MAX_KEYCHAIN_READS_PER_MINUTE:
-                        # Browsers legitimately access keychain frequently
-                        if not is_browser:
-                            threats.append({
-                                "type": "EXCESSIVE_KEYCHAIN_ACCESS",
-                                "severity": "HIGH",
-                                "title": "🔐 UNUSUAL KEYCHAIN ACCESS",
-                                "summary": f"Process '{name}' (PID: {pid}) accessed keychain {len(recent_accesses)} times in 1 minute",
-                                "pid": pid,
-                                "process": name,
-                                "access_count": len(recent_accesses)
-                            })
+                    # Low and Slow Detection: Flag any unauthorized access immediately
+                    is_trusted_accessor = is_browser or any(t.lower() in name.lower() for t in patterns.TRUSTED_VAULT_ACCESSORS)
+                    
+                    if not is_trusted_accessor:
+                        threats.append({
+                            "type": "UNAUTHORIZED_CREDENTIAL_ACCESS",
+                            "severity": "CRITICAL",
+                            "title": "🔐 UNAUTHORIZED CREDENTIAL ACCESS",
+                            "summary": f"Process '{name}' (PID: {pid}) is accessing a sensitive credential file: {accessed_cookie_file or 'Keychain'}",
+                            "pid": pid,
+                            "process": name,
+                            "target": accessed_cookie_file or "Keychain"
+                        })
                             
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue

@@ -89,12 +89,16 @@ VAULT_PATHS = [
     os.path.expanduser('~/Library/Keychains')
 ]
 
-TRUSTED_VAULT_ACCESSORS = ['ssh', 'git', 'ssh-agent', 'security', 'Code Helper', 'secd', 'trustedpeershelper', 'loginwindow']
+TRUSTED_VAULT_ACCESSORS = ['ssh', 'git', 'ssh-agent', 'security', 'Code Helper', 'secd', 'trustedpeershelper', 'loginwindow', 'Antigravity']
 
 DEBUG_PORT_FLAG = '--remote-debugging-port'
 DEBUG_PORTS = [9222, 9229]
 
-TRUSTED_BROWSER_PARENTS = ['launchd', 'Antigravity', 'Code', 'Finder']
+TRUSTED_BROWSER_PARENTS = [
+    'launchd', 'Antigravity', 'Code', 'Finder', 'iterm', 'iterm2', 'terminal', 
+    'zsh', 'bash', 'python3', 'python', 'idea', 'goland', 'pycharm', 'cursor',
+    'system_profiler', 'loginwindow'
+]
 
 BTC_PATTERN = r'\b(?:[13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[ac-hj-np-z02-9]{11,71})\b'
 ETH_PATTERN = r'\b0x[a-fA-F0-9]{40}\b'

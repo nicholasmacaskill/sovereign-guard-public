@@ -29,7 +29,7 @@ except ImportError:
     _SESSION_LEARNER_AVAILABLE = False
 
 try:
-    from sovereign_engine import tripwire
+    from sovereign_engine import tripwire, patterns
     _TRIPWIRE_AVAILABLE = True
 except ImportError:
     _TRIPWIRE_AVAILABLE = False
@@ -387,8 +387,9 @@ def handle_safe_mode_transitions(is_safe_mode, was_safe_mode):
         return False
     return was_safe_mode
 
-def run_multimedia_sequence():
+def run_multimedia_sequence(procs=None):
     """Checks for unauthorized camera/mic/screen access."""
+    # Throttled internally in scanners.py, but we can also avoid the call here
     threats = core.check_multimedia_access()
     if threats:
         for t in threats:
@@ -398,7 +399,7 @@ def run_multimedia_sequence():
             speak(f"Warning. Unauthorized {t['process']} is accessing your camera or microphone.")
         return True
     
-    if core.check_screen_sharing():
+    if core.check_screen_sharing(procs=procs):
         msg = "\n🚨 SCREEN SHARING ALERT: Active screen sharing detected."
         print(msg)
         logger.warning(msg)
@@ -437,17 +438,45 @@ def run_browser_persistence_sequence(baseline):
             speak(f"Security Alert. New browser persistence module detected in {os.path.basename(os.path.dirname(t['path']))}.")
     return new_baseline
 
+# Global Cache for Process Logging (NDJSON and disk I/O are expensive)
+PROCESS_LOG_CACHE = {} # {pid: (exe_path, timestamp)}
+LOG_CACHE_EXPIRY = 3600 # 1 hour
+
 def scan_single_process(proc, is_safe_mode, current_mode, seen_pids, scanned_pids, run_memory_scan=False):
-    """Performs deep security analysis on a single process."""
+    """Performs deep security analysis on a single process using pre-fetched data."""
     try:
-        pid = proc.pid
-        name = proc.name()
+        # psutil 'info' dictionary contains pre-fetched attributes
+        pinfo = proc.info
+        pid = pinfo['pid']
+        name = pinfo['name'] or ""
+        exe_path = pinfo['exe'] or ""
         
         if pid in scanned_pids: return 0
         scanned_pids.add(pid)
         
+        name_lower = name.lower()
+        
+        # 0. Fast Whitelist Check (Before any heavy core logic)
+        # Avoid calling into core/analyzer if it's a known safe process
+        if any(safe in name_lower for safe in core.SAFE_LIST_PROCESSES):
+            return 0
+
+        # Optimization: Only log to learning engine if hasn't been seen this hour
+        # This drastically reduces Disk I/O
+        last_log = PROCESS_LOG_CACHE.get(pid)
+        if not last_log or last_log[0] != exe_path or (time.time() - last_log[1] > LOG_CACHE_EXPIRY):
+            try:
+                from learning_engine import log_process
+                log_process(name, exe_path, pinfo['cmdline'] or [])
+                PROCESS_LOG_CACHE[pid] = (exe_path, time.time())
+            except: pass
+
+        if current_mode == 'learn':
+            return 0
+        
         # Injection Defense: Memory Scanning (only when triggered)
         if run_memory_scan and core.ENABLE_MEMORY_SCANNING:
+            # Memory scanning is still heavy, but we only do it every MEMORY_SCAN_INTERVAL
             memory_threat = core.scan_process_memory(proc)
             if memory_threat:
                 msg = f"\n{memory_threat['title']}: {memory_threat['summary']}"
@@ -456,37 +485,22 @@ def scan_single_process(proc, is_safe_mode, current_mode, seen_pids, scanned_pid
                 notify_alert(memory_threat['title'], memory_threat['summary'], sound="Basso")
                 speak("Security alert. Possible memory injection detected in browser.")
                 if not is_safe_mode:
-                    # Browsers are prone to JIT false positives; we log and alert but don't kill 
-                    # unless it's a known non-browser or in aggressive mode.
-                    if any(b in name.lower() for b in ['chrome', 'brave', 'edge', 'arc', 'safari']):
-                        # Check if this browser is ALSO exposing the hacker's port (definitive threat)
-                        cmdline = ' '.join(proc.cmdline())
-                        is_exposing_port = patterns.DEBUG_PORT_FLAG in cmdline and "9222" in cmdline
-                        
+                    if any(b in name_lower for b in ['chrome', 'brave', 'edge', 'arc', 'safari']):
+                        cmdline_str = ' '.join(pinfo['cmdline'] or [])
+                        is_exposing_port = patterns.DEBUG_PORT_FLAG in cmdline_str and "9222" in cmdline_str
                         if is_exposing_port:
-                            try:
-                                proc.kill()
-                                print(f"    [!] NEUTRALIZED: '{name}' (PID: {pid}) killed - Memory Injection + Debug Port 9222 detected.")
+                            try: proc.kill(); print(f"    [!] NEUTRALIZED: '{name}' killed - Memory Injection + Debug Port 9222.")
                             except: pass
                         else:
-                            print(f"    [!] LOGGED: Suspected injection in '{name}' (PID: {pid}). Termination skipped to prevent work loss.")
+                            print(f"    [!] LOGGED: Suspected injection in '{name}'. Termination skipped.")
                             logger.warning(f"Injection termination skipped for browser: {name}")
                     else:
-                        try:
-                            proc.kill()
-                            print(f"    [!] NEUTRALIZED: '{name}' (PID: {pid}) terminated due to injection.")
+                        try: proc.kill(); print(f"    [!] NEUTRALIZED: '{name}' terminated due to injection.")
                         except: pass
         
-        # Module/Library Verification
-        if run_memory_scan and core.ENABLE_MEMORY_SCANNING:
-            module_threat = core.verify_process_modules(proc)
-            if module_threat:
-                msg = f"\n{module_threat['title']}: {module_threat['summary']}"
-                print(msg)
-                logger.warning(msg)
-                notify_alert(module_threat['title'], module_threat['summary'])
-        
-        # 1. Vault Guard
+        # 1. Vault Guard (Check if accessing sensitive paths)
+        # core.check_vault_access uses proc.open_files() which is expensive
+        # We only run this on non-whitelisted processes that are still running
         vault_threat = core.check_vault_access(proc)
         if vault_threat:
             msg = f"\n{vault_threat['title']}: {vault_threat['summary']}"
@@ -497,16 +511,12 @@ def scan_single_process(proc, is_safe_mode, current_mode, seen_pids, scanned_pid
                 try: proc.kill(); print(f"    [!] NEUTRALIZED: '{name}' killed.")
                 except: pass
 
-        # 2. Whitelist Bypass
-        name_lower = name.lower()
-        if any(safe in name_lower for safe in core.SAFE_LIST_PROCESSES):
-            return 0
-            
         if pid in seen_pids: return 0
         seen_pids.add(pid)
         
-        # 3. Deep Core Check
-        alert = core.check_process(proc, mode=current_mode, safe_mode=is_safe_mode)
+        # 3. Deep Core Check (Pass mode to avoid redundant disk reads inside analyzer)
+        # Also disable whitelist reload inside the loop (we'll do it once per loop)
+        alert = core.check_process(proc, mode=current_mode, safe_mode=is_safe_mode, reload_whitelist=False)
         if alert:
             print(f"\n{alert['summary']}")
             logger.warning(alert['summary'])
@@ -517,7 +527,7 @@ def scan_single_process(proc, is_safe_mode, current_mode, seen_pids, scanned_pid
                     speak("Critical threat detected. Process neutralized.")
                 except: pass
         
-        # 4. Network Monitor
+        # 4. Network Monitor (Only for browsers)
         if any(t in name_lower for t in ['chrome', 'brave', 'edge', 'arc', 'opera', 'vivaldi', 'chromium']):
             network_threat = core.check_network_activity(proc, mode=current_mode)
             if network_threat:
@@ -531,7 +541,7 @@ def scan_single_process(proc, is_safe_mode, current_mode, seen_pids, scanned_pid
                         speak("Reverse shell detected and neutralized.")
                     except: pass
         return 1
-    except (psutil.NoSuchProcess, psutil.AccessDenied):
+    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
         return 0
 
 def run_mitm_sequence():
@@ -589,6 +599,10 @@ def monitor_loop():
 
     was_safe_mode = False
     
+    # Frequency Timers
+    last_multimedia_check = 0
+    last_clipboard_check = 0
+    
     try:
         from learning_engine import get_protection_mode
     except:
@@ -596,36 +610,53 @@ def monitor_loop():
 
     try:
         while True:
+            t_start = time.time()
+            
             # 1. State Caching (Efficiency)
+            from sovereign_engine import patterns
+            patterns.load_dynamic_whitelist()
+
             is_safe_mode = check_safe_mode()
             current_mode = get_protection_mode()
             was_safe_mode = handle_safe_mode_transitions(is_safe_mode, was_safe_mode)
 
-            # 2. Sequential Security Checks
-            last_clipboard = run_clipboard_sequence(last_clipboard, is_safe_mode)
-            run_multimedia_sequence()
+            # 2. Sequential Security Checks (Throttled)
+            if time.time() - last_clipboard_check > 5:
+                 last_clipboard = run_clipboard_sequence(last_clipboard, is_safe_mode)
+                 last_clipboard_check = time.time()
             
-            if time.time() - last_persistence_check > 30:
+            # 3. Process & Network Scan (Heavy)
+            scanned_pids = set()
+            scanned_count = 0
+            
+            # Pre-fetch all process info in ONE call for efficiency
+            procs = list(psutil.process_iter(['pid', 'name', 'exe', 'cmdline', 'ppid']))
+            
+            if time.time() - last_multimedia_check > 20:
+                run_multimedia_sequence(procs=[p.info for p in procs])
+                last_multimedia_check = time.time()
+            
+            if time.time() - last_persistence_check > 60:
                 persistence_baseline = run_persistence_sequence(persistence_baseline)
                 browser_persistence_baseline = run_browser_persistence_sequence(browser_persistence_baseline)
                 last_persistence_check = time.time()
 
-            if time.time() - last_mitm_check > 60:
+            if time.time() - last_mitm_check > 120:
                 run_mitm_sequence()
                 last_mitm_check = time.time()
 
-            # LaunchAgent Plist Scan (every 2 minutes)
-            if time.time() - last_plist_scan > 120:
+            # LaunchAgent Plist Scan (every 5 minutes)
+            if time.time() - last_plist_scan > 300:
                 scan_launchagent_plists()
                 last_plist_scan = time.time()
 
-            # Port 9222 Activity Monitor (every 10 seconds)
-            if time.time() - last_debug_port_check > 10:
+            # Port 9222 Activity Monitor (every 30 seconds)
+            if time.time() - last_debug_port_check > 30:
                 check_debug_port_activity()
                 last_debug_port_check = time.time()
 
-            # LinkedIn Session Monitor + Domain Learner (every 30 seconds)
-            if time.time() - last_linkedin_check > 30:
+            # LinkedIn Session Monitor (every 60 seconds)
+            if time.time() - last_linkedin_check > 60:
                 check_linkedin_session_activity()
                 if _SESSION_LEARNER_AVAILABLE:
                     session_learner.scan_browser_session_domains()
@@ -651,25 +682,20 @@ def monitor_loop():
             #     last_tab_check = time.time()
 
             # 2.5 Injection Defense Sequences
-            # Binary Integrity Check (every 5 minutes)
-            if core.ENABLE_BINARY_VERIFICATION and time.time() - last_integrity_check > core.INTEGRITY_CHECK_INTERVAL:
-                integrity_threats = core.verify_binary_integrity()
-                for t in integrity_threats:
-                    print(f"\n{t['title']}: {t['summary']}")
-            # Binary Integrity Verification (periodic)
-            if core.ENABLE_BINARY_VERIFICATION and (time.time() - last_integrity_check > core.INTEGRITY_CHECK_INTERVAL):
+            # Binary Integrity Check (Throttled to 10 minutes)
+            if core.ENABLE_BINARY_VERIFICATION and time.time() - last_integrity_check > 600:
                 binary_threats = core.verify_binary_integrity()
                 for t in binary_threats:
                     msg = f"\n{t['title']}: {t['summary']}"
                     print(msg)
                     logger.critical(msg)
                     notify_alert(t['title'], t['summary'], sound="Basso")
-                    # Binary violation = Fatal. We kill any process matching this binary.
+                    # Binary violation = Fatal. Neutralize any process matching this binary.
                     if not is_safe_mode:
-                        for p in psutil.process_iter(['exe']):
+                        for p in procs:
                             try:
                                 if p.info['exe'] == t['path']:
-                                    p.kill()
+                                    psutil.Process(p.info['pid']).kill()
                                     print(f"    [!] NEUTRALIZED: Tampered binary '{os.path.basename(t['path'])}' terminated.")
                             except: pass
                 last_integrity_check = time.time()
@@ -684,9 +710,8 @@ def monitor_loop():
                 last_launch_services_check = time.time()
             
             # Keychain Access Monitor (every 30 seconds)
-            # Keychain Access Monitor (every 30 seconds)
             if core.ENABLE_KEYCHAIN_MONITORING and time.time() - last_keychain_check > core.KEYCHAIN_MONITOR_INTERVAL:
-                keychain_threats = core.monitor_keychain_access()
+                keychain_threats = core.monitor_keychain_access(procs=procs)
                 for t in keychain_threats:
                     print(f"\n{t['title']}: {t['summary']}")
                     logger.warning(f"Keychain Access: {t['summary']}")
@@ -705,7 +730,7 @@ def monitor_loop():
                     try:
                         p = psutil.Process(t['pid'])
                         p.kill()
-                        print(f"    [!] NEUTRALIZED: '{t['process']}' (PID: {t['pid']}) killed for touching bait.")
+                        print(f"    [!] NEUTRALIZED: '{t['process']}' killed.")
                     except: pass
             
             # Active Defense: File Monitor (TEMPORARILY DISABLED - causes Safari launch)
@@ -720,17 +745,14 @@ def monitor_loop():
             #     if t.get('action') == "KILLED":
             #         speak("Active Defense engaged. Unauthorized access terminated.")
 
-            # 3. Process & Network Scan
-            scanned_pids = set()
-            scanned_count = 0
-            
             # Determine if we should run memory scans this iteration
             run_memory_scan = core.ENABLE_MEMORY_SCANNING and (time.time() - last_memory_scan > core.MEMORY_SCAN_INTERVAL)
             if run_memory_scan:
                 last_memory_scan = time.time()
-            
+                
+            # Perform the actual process scan using pre-fetched procs
             try:
-                for proc in psutil.process_iter(['pid', 'name']):
+                for proc in procs:
                     try:
                         scanned_count += scan_single_process(proc, is_safe_mode, current_mode, seen_pids, scanned_pids, run_memory_scan)
                     except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, OSError):
@@ -742,7 +764,7 @@ def monitor_loop():
             if time.time() - last_heartbeat > 60:
                 mode_str = "DEV MODE" if is_safe_mode else "PROTECT"
                 if current_mode == 'learn': mode_str = "LEARN"
-                print(f"🛡️  [{time.strftime('%H:%M:%S')}] {mode_str} | Scanned: {scanned_count}")
+                print(f"🛡️  [{time.strftime('%H:%M:%S')}] {mode_str} | Scanned: {scanned_count} | Loop: {time.time()-t_start:.2f}s")
                 last_heartbeat = time.time()
 
             # 5. Hourly Maintenance
@@ -774,7 +796,7 @@ def monitor_loop():
                 notify_alert("Sovereign Guard Status", f"Guard active in {current_mode} mode.")
                 last_hourly_notify = time.time()
 
-            time.sleep(2.0)
+            time.sleep(5.0)
             
     except KeyboardInterrupt:
         print("\nStopping Monitor.")

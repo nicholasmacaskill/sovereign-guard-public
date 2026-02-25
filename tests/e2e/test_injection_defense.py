@@ -304,9 +304,9 @@ class TestKeychainMonitoring:
         
         threats = injection_defense.monitor_keychain_access()
         
-        # Should detect excessive access
+        # Should detect unauthorized access immediately (replacing old excessive threshold test)
         assert len(threats) > 0
-        assert threats[0]['type'] == 'EXCESSIVE_KEYCHAIN_ACCESS'
+        assert threats[0]['type'] == 'UNAUTHORIZED_CREDENTIAL_ACCESS'
         assert threats[0]['process'] == 'suspicious_app'
 
 

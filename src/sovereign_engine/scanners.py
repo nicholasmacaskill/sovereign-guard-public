@@ -70,18 +70,29 @@ def scan_extensions():
         except: continue
     return risky_extensions
 
-def check_multimedia_access():
-    """Checks for unauthorized camera/mic access."""
+_last_multimedia_check = 0
+_multimedia_cache = []
+
+def check_multimedia_access(force=False):
+    """Checks for unauthorized camera/mic access with throttling."""
+    global _last_multimedia_check, _multimedia_cache
+    import time
+    if not force and time.time() - _last_multimedia_check < 30:
+        return _multimedia_cache
+
     MULTIMEDIA_WHITELIST = [
         'Antigravity', 'Google Chrome', 'Brave Browser', 'Arc', 'Microsoft Edge',
         'Safari', 'Zoom', 'Slack', 'Discord', 'FaceTime', 'Skype', 'WhatsApp',
-        'callservicesd', 'AudioComponentRegistrar', 'PowerChime', 'say', 'corespeechd'
+        'callservicesd', 'AudioComponentRegistrar', 'PowerChime', 'say', 'corespeechd',
+        'ControlCenter', 'avconferenced', 'webcontent'
     ]
     threats = []
     if platform.system() != 'Darwin': return threats
     try:
-        cmd = "lsof -n -w | grep -Ei 'VDC|AppleCamera|CoreAudio'"
-        res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        # Targeted lsof to specific multimedia devices is faster
+        # VDC = Video, AppleCamera = Camera, CoreAudio = Audio
+        cmd = "lsof -n -w -c /^[^ ]*$/ | grep -Ei 'VDC|AppleCamera|CoreAudio' | grep -v 'google chrome helper' | grep -v 'brave browser helper'"
+        res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
         if res.returncode == 0:
             lines = res.stdout.splitlines()
             seen_pids = set()
@@ -92,30 +103,40 @@ def check_multimedia_access():
                 proc_name, pid = parts[0], parts[1]
                 if pid in seen_pids: continue
                 seen_pids.add(pid)
-                is_safe = any(safe.lower() in proc_name.lower() or proc_name.lower() in safe.lower() for safe in MULTIMEDIA_WHITELIST)
                 
-                # Double check with psutil for system paths
+                is_safe = any(safe.lower() in proc_name.lower() for safe in MULTIMEDIA_WHITELIST)
+                
                 if not is_safe:
                     try:
                         p = psutil.Process(int(pid))
                         exe = p.exe()
-                        if exe.startswith('/System/'):
+                        if exe.startswith('/System/') or exe.startswith('/usr/sbin/'):
                             is_safe = True
                     except: pass
 
                 if not is_safe and not proc_name.startswith('com.apple.'):
                     threats.append({"type": "MULTIMEDIA_ACCESS", "process": proc_name, "pid": pid})
     except: pass
+    
+    _last_multimedia_check = time.time()
+    _multimedia_cache = threats
     return threats
 
-def check_screen_sharing():
-    """Detects active screen sharing/recording."""
-    SCREEN_SHARING_AGENTS = []
-    import psutil
-    try:
-        for proc in psutil.process_iter(['name']):
-            if proc.info['name'] in SCREEN_SHARING_AGENTS: return True
-    except: pass
+def check_screen_sharing(procs=None):
+    """Detects active screen sharing/recording using provided process list."""
+    SCREEN_SHARING_AGENTS = [
+        'ScreenSharingD', 'ScreensharingAgent', 'DisplayExtensions', 'AirPlayXPCHelper'
+    ]
+    if procs:
+        for p_info in procs:
+            if p_info.get('name') in SCREEN_SHARING_AGENTS: return True
+    else:
+        import psutil
+        try:
+            for proc in psutil.process_iter(['name']):
+                if proc.info['name'] in SCREEN_SHARING_AGENTS: return True
+        except: pass
+    return False
 
 def scan_browser_history():
     """Scans browser history for visits to known infostealer domains."""
